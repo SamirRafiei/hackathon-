@@ -316,3 +316,12 @@ Production also needs payment-webhook verification, provider reconciliation, fai
 Revised from the original **Pact — 24-hour hackathon implementation plan** backup and the later **Pact — Landlord–Tenant Deposit Implementation Plan**, together with the referenced “GitHub label organisation” conversation.
 
 Preserved: existing stack/foundation, team structure, immutable acceptance, secure invitations, private evidence, integer ledger, atomic/idempotent settlement, dashboard/receipts, deployment and rehearsal schedule. Restored equipment support and a minimal simulated reviewer from the original plan. Retained the later housing plan's submission-triggered 48-hour rule and two-person MVP. Added protected advances with a different default recipient, explicit arrival approval, cancellation/objection handling, fraud safeguards and production authorization gates. Group deposits, QR flows and broader non-rental conditional payments remain deferred.
+
+
+## Handover implementation checkpoint — 17 October 2026
+
+Five feature modules have been implemented and integrated into the browser-local demonstration: evidence upload/preview adapters, versioned condition baseline and acknowledgments, photographed return declarations, before/after comparison, and student arrival/listing inspection. The return fixes a 48-hour device-clock deadline without releasing funds; both baseline acknowledgments are required before activation. QR remains deferred.
+
+Verification: focused validation/UI/integration tests; full project checks including existing database regressions and production build; browser photo reload, two-party activation, return declaration and comparison; phone-width overflow check. This does not establish hosted Supabase behavior. The demo uses fake identities, localStorage metadata and IndexedDB photo files.
+
+Pending backend integration: authenticated evidence gateway, authoritative baseline/return operations, shared multi-user persistence, signed downloads and server deadline processing. Arrival records do not release advances; the separate accepted advance/payment workflow remains with the relevant team workstreams. See `src/features/handover/IMPLEMENTATION.md` for module handoffs.

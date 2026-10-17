@@ -123,10 +123,17 @@ describe("EvidenceComparison", () => {
         submittedAt: "2026-10-17T10:00:00Z",
       },
     ];
-    render(<EvidenceComparison {...settings} />);
+    render(
+      <EvidenceComparison
+        {...settings}
+        participantNames={{ owner: "Alex", renter: "Sam" }}
+      />,
+    );
     expect(screen.getByText("Preview camera.webp")).toBeInTheDocument();
     expect(screen.getByText("Lens before handover")).toBeInTheDocument();
-    expect(screen.getByText(/Uploaded by owner/)).toBeInTheDocument();
+    expect(screen.getByText(/Uploaded by Alex/)).toBeInTheDocument();
+    expect(screen.getByText(/Submitted by Sam/)).toBeInTheDocument();
+    expect(screen.queryByText(/Item ID:/)).not.toBeInTheDocument();
   });
 
   it("withholds previews for evidence attached to an unrelated agreement", () => {

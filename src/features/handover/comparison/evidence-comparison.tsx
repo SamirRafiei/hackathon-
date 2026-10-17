@@ -14,6 +14,7 @@ export type EvidenceComparisonProps = {
   baseline: BaselineRecord | null;
   returnRecord: ReturnRecord | null;
   storage: EvidenceStorage;
+  participantNames?: Record<string, string>;
 };
 
 function RecordTime({ value }: { value: string }) {
@@ -51,11 +52,13 @@ function EvidenceList({
   storage,
   agreementId,
   phase,
+  participantNames,
 }: {
   files: EvidenceFile[];
   storage: EvidenceStorage;
   agreementId: string;
   phase: "baseline" | "return";
+  participantNames?: Record<string, string>;
 }) {
   if (!files.length)
     return <p className="text-sm text-stone-500">No evidence attached.</p>;
@@ -71,11 +74,9 @@ function EvidenceList({
           ) : (
             <>
               <EvidencePreview file={file} storage={storage} />
-              <p className="mt-2 text-sm font-medium break-words text-stone-900">
-                {file.fileName}
-              </p>
               <p className="text-xs text-stone-500">
-                Uploaded by {file.uploaderId} ·{" "}
+                Uploaded by{" "}
+                {participantNames?.[file.uploaderId] ?? file.uploaderId} ·{" "}
                 <RecordTime value={file.createdAt} />
               </p>
               <p className="mt-1 text-sm whitespace-pre-wrap text-stone-600">
@@ -94,6 +95,7 @@ export function EvidenceComparison({
   baseline,
   returnRecord,
   storage,
+  participantNames,
 }: EvidenceComparisonProps) {
   if (
     baseline &&
@@ -158,6 +160,7 @@ export function EvidenceComparison({
                 storage={storage}
                 agreementId={baseline.agreementId}
                 phase="baseline"
+                participantNames={participantNames}
               />
             </>
           ) : (
@@ -175,8 +178,10 @@ export function EvidenceComparison({
           {returnRecord ? (
             <>
               <p className="text-sm text-stone-600">
-                Submitted by {returnRecord.submittedBy} ·{" "}
-                <RecordTime value={returnRecord.submittedAt} />
+                Submitted by{" "}
+                {participantNames?.[returnRecord.submittedBy] ??
+                  returnRecord.submittedBy}{" "}
+                · <RecordTime value={returnRecord.submittedAt} />
               </p>
               <p className="text-sm font-medium text-stone-900">
                 Return location: {returnRecord.location || "Not recorded"}
@@ -189,6 +194,7 @@ export function EvidenceComparison({
                 storage={storage}
                 agreementId={returnRecord.agreementId}
                 phase="return"
+                participantNames={participantNames}
               />
             </>
           ) : (
@@ -218,14 +224,11 @@ export function EvidenceComparison({
               key={row.id}
               className="space-y-3 rounded-xl border border-stone-200 p-4"
             >
-              <p className="text-xs font-medium text-stone-500">
-                Item ID: {row.id}
-              </p>
               <p
                 className={`text-sm font-medium ${row.status === "unchanged" ? "text-stone-600" : "text-amber-800"}`}
               >
                 {row.status === "ambiguous"
-                  ? "Duplicate item ID — cannot reliably match these entries"
+                  ? "Duplicate checklist entries — cannot reliably match these entries"
                   : row.status === "baseline-only"
                     ? "Missing from return checklist"
                     : row.status === "return-only"

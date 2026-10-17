@@ -1,4 +1,17 @@
 import { z } from "zod";
+import type {
+  BaselineRecord,
+  ReturnRecord,
+  ArrivalRecord,
+} from "@/features/handover/contracts";
+import {
+  baselineRecordSchema,
+  returnRecordSchema,
+  arrivalRecordSchema,
+  handoverStateSchema,
+  emptyHandoverState,
+  type HandoverState,
+} from "@/features/handover/record-schema";
 import { demoActors, type PactActor } from "@/lib/auth/identity-provider";
 
 export const DEMO_AMOUNT_MINOR = 100_000;
@@ -8,6 +21,7 @@ export type AgreementStatus =
   | "AWAITING_ACCEPTANCE"
   | "AWAITING_FUNDING"
   | "FUNDED"
+  | "ACTIVE"
   | "RETURN_REVIEW"
   | "PROPOSAL_PENDING"
   | "COMPLETED";
@@ -58,6 +72,7 @@ export type DemoAgreement = {
   proposal: SettlementProposal | null;
   ledger: LedgerEntry[];
   activity: ActivityEvent[];
+  handover?: HandoverState;
 };
 
 export type DemoSnapshot = {
@@ -118,6 +133,7 @@ export const demoSnapshotSchema = z
         "AWAITING_ACCEPTANCE",
         "AWAITING_FUNDING",
         "FUNDED",
+        "ACTIVE",
         "RETURN_REVIEW",
         "PROPOSAL_PENDING",
         "COMPLETED",
@@ -127,6 +143,7 @@ export const demoSnapshotSchema = z
       proposal: proposalSchema.nullable(),
       ledger: z.array(entrySchema),
       activity: z.array(activitySchema),
+      handover: handoverStateSchema.optional(),
     }),
   })
   .superRefine(({ agreement }, context) => {
@@ -180,6 +197,7 @@ export const demoSnapshotSchema = z
 
     const hasFunding = [
       "FUNDED",
+      "ACTIVE",
       "RETURN_REVIEW",
       "PROPOSAL_PENDING",
       "COMPLETED",
@@ -214,9 +232,13 @@ export const demoSnapshotSchema = z
     }
 
     if (
-      ["FUNDED", "RETURN_REVIEW", "PROPOSAL_PENDING", "COMPLETED"].includes(
-        status,
-      ) &&
+      [
+        "FUNDED",
+        "ACTIVE",
+        "RETURN_REVIEW",
+        "PROPOSAL_PENDING",
+        "COMPLETED",
+      ].includes(status) &&
       !(acceptedBy.landlord && acceptedBy.tenant)
     ) {
       context.addIssue({
@@ -227,7 +249,9 @@ export const demoSnapshotSchema = z
     }
 
     if (
-      ["FUNDED", "RETURN_REVIEW", "PROPOSAL_PENDING"].includes(status) &&
+      ["FUNDED", "ACTIVE", "RETURN_REVIEW", "PROPOSAL_PENDING"].includes(
+        status,
+      ) &&
       reservedMinor === 0
     ) {
       context.addIssue({
@@ -489,24 +513,205 @@ export function fundAgreement(
   return { ...snapshot, agreement };
 }
 
-export function submitReturn(
+/** Browser-demo transition only; a server repository must authorize and timestamp independently. */
+export function recordBaseline(
   snapshot: DemoSnapshot,
   actor: PactActor,
+  input: BaselineRecord,
 ): DemoSnapshot {
-  requireRole(actor, "tenant");
-  if (snapshot.agreement.status !== "FUNDED") {
+  if (snapshot.agreement.status !== "FUNDED")
     throw new Error(
-      "The agreement must be funded before return can be recorded.",
+      "Baseline changes require a funded agreement awaiting activation.",
     );
+  const baseline = baselineRecordSchema.parse(input);
+  const current = snapshot.agreement.handover?.baseline;
+  if (
+    baseline.agreementId !== snapshot.agreement.id ||
+    baseline.termsVersion !== snapshot.agreement.termsVersion ||
+    baseline.assetType !== snapshot.agreement.assetType
+  )
+    throw new Error(
+      "The baseline does not match the current agreement version.",
+    );
+  if (actor.id !== demoActors.landlord.id && actor.id !== demoActors.tenant.id)
+    throw new Error("Only agreement participants can acknowledge a baseline.");
+  if (
+    !baseline.evidence.some((file) => file.mimeType.startsWith("image/")) ||
+    baseline.evidence.some(
+      (file) =>
+        file.phase !== "baseline" ||
+        file.agreementId !== baseline.agreementId ||
+        !file.submittedAt,
+    )
+  )
+    throw new Error("A submitted baseline photograph is required.");
+  const allowedIds = [demoActors.landlord.id, demoActors.tenant.id] as string[];
+  if (
+    Object.keys(baseline.acknowledgedBy).some((id) => !allowedIds.includes(id))
+  )
+    throw new Error("Unknown baseline acknowledgment.");
+  if (
+    !current ||
+    baseline.id !== current.id ||
+    baseline.version !== current.version
+  ) {
+    requireRole(actor, "landlord");
+    if (
+      baseline.version !== (current?.version ?? 0) + 1 ||
+      !baseline.acknowledgedBy[actor.id] ||
+      Object.keys(baseline.acknowledgedBy).length !== 1
+    )
+      throw new Error(
+        "A new baseline must reset consent and be acknowledged by its owner.",
+      );
+  } else {
+    const content = (record: BaselineRecord) =>
+      JSON.stringify({ ...record, acknowledgedBy: {} });
+    if (content(baseline) !== content(current))
+      throw new Error(
+        "Published baseline content is immutable; publish a revision instead.",
+      );
+    const expected = {
+      ...current.acknowledgedBy,
+      [actor.id]: baseline.acknowledgedBy[actor.id],
+    };
+    if (
+      !expected[actor.id] ||
+      JSON.stringify(expected) !== JSON.stringify(baseline.acknowledgedBy)
+    )
+      throw new Error("Each party must acknowledge for themselves.");
   }
+  const ready = Boolean(
+    baseline.acknowledgedBy[demoActors.landlord.id] &&
+    baseline.acknowledgedBy[demoActors.tenant.id],
+  );
   let agreement: DemoAgreement = {
     ...snapshot.agreement,
-    status: "RETURN_REVIEW",
+    status: ready ? "ACTIVE" : "FUNDED",
+    handover: {
+      ...(snapshot.agreement.handover ?? emptyHandoverState()),
+      baseline,
+    },
   };
   agreement = recordActivity(
     agreement,
     actor,
-    "Recorded the rental return and started the review",
+    ready
+      ? "Both parties acknowledged the same condition baseline; rental activated"
+      : `Published or acknowledged condition baseline version ${baseline.version}`,
+  );
+  return { ...snapshot, agreement };
+}
+
+export function recordArrivalInspection(
+  snapshot: DemoSnapshot,
+  actor: PactActor,
+  input: ArrivalRecord,
+): DemoSnapshot {
+  requireRole(actor, "tenant");
+  if (
+    actor.id !== demoActors.tenant.id ||
+    !["FUNDED", "ACTIVE"].includes(snapshot.agreement.status)
+  )
+    throw new Error(
+      "Only the renter can record an arrival inspection after funding.",
+    );
+  if (snapshot.agreement.assetType !== "APARTMENT")
+    throw new Error("Arrival inspection applies to apartments.");
+  const record = arrivalRecordSchema.parse(input);
+  if (
+    record.agreementId !== snapshot.agreement.id ||
+    record.submittedBy !== actor.id ||
+    snapshot.agreement.handover?.arrivalRecord
+  )
+    throw new Error("Arrival inspection is unrelated or already submitted.");
+  if (
+    record.evidence.some(
+      (file) =>
+        file.agreementId !== record.agreementId ||
+        file.phase !== "arrival" ||
+        !file.submittedAt,
+    )
+  )
+    throw new Error("Arrival evidence must be finalized for this agreement.");
+  let agreement: DemoAgreement = {
+    ...snapshot.agreement,
+    handover: {
+      ...(snapshot.agreement.handover ?? emptyHandoverState()),
+      arrivalRecord: record,
+    },
+  };
+  agreement = recordActivity(
+    agreement,
+    actor,
+    "Recorded arrival inspection; no funds were released",
+  );
+  return { ...snapshot, agreement };
+}
+
+export function submitReturn(
+  snapshot: DemoSnapshot,
+  actor: PactActor,
+  input?: ReturnRecord,
+): DemoSnapshot {
+  requireRole(actor, "tenant");
+  if (!["FUNDED", "ACTIVE"].includes(snapshot.agreement.status))
+    throw new Error(
+      "The agreement must be funded before return can be recorded.",
+    );
+  const baseline = snapshot.agreement.handover?.baseline;
+  if (
+    snapshot.agreement.status !== "ACTIVE" ||
+    !baseline ||
+    !baseline.acknowledgedBy[demoActors.landlord.id] ||
+    !baseline.acknowledgedBy[demoActors.tenant.id]
+  )
+    throw new Error(
+      "Both parties must acknowledge the baseline before return.",
+    );
+  if (!input)
+    throw new Error("Return photographs and a declaration are required.");
+  const record = returnRecordSchema.parse(input);
+  if (
+    snapshot.agreement.handover?.returnRecord ||
+    record.agreementId !== snapshot.agreement.id ||
+    record.submittedBy !== actor.id ||
+    record.baselineId !== baseline.id ||
+    record.baselineVersion !== baseline.version ||
+    actor.id !== demoActors.tenant.id
+  )
+    throw new Error(
+      "The return does not match this active baseline or was already submitted.",
+    );
+  if (
+    Date.parse(record.inspectionDeadline) - Date.parse(record.submittedAt) !==
+    48 * 60 * 60 * 1000
+  )
+    throw new Error(
+      "The first return declaration starts exactly one 48-hour review window.",
+    );
+  if (
+    !record.evidence.some((file) => file.mimeType.startsWith("image/")) ||
+    record.evidence.some(
+      (file) =>
+        file.agreementId !== record.agreementId ||
+        file.phase !== "return" ||
+        !file.submittedAt,
+    )
+  )
+    throw new Error("Submitted return photographs are required.");
+  let agreement: DemoAgreement = {
+    ...snapshot.agreement,
+    status: "RETURN_REVIEW",
+    handover: {
+      ...(snapshot.agreement.handover ?? emptyHandoverState()),
+      returnRecord: record,
+    },
+  };
+  agreement = recordActivity(
+    agreement,
+    actor,
+    "Recorded the rental return and fixed the 48-hour review deadline",
   );
   return { ...snapshot, agreement };
 }

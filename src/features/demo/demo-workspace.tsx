@@ -19,6 +19,7 @@ import {
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -40,9 +41,12 @@ import {
   fundAgreement,
   proposeSplit,
   submitReturn,
+  recordBaseline,
+  recordArrivalInspection,
   type DemoSnapshot,
 } from "@/features/demo/model";
 import { LocalDemoRepository } from "@/features/demo/repository";
+import { HandoverWorkspace } from "@/features/handover/handover-workspace";
 import AgreementSetupForm from "@/features/agreements/components/agreement-setup-form";
 
 const dateFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -69,7 +73,9 @@ function statusLabel(status: DemoSnapshot["agreement"]["status"]) {
     case "AWAITING_FUNDING":
       return "Ready to fund";
     case "FUNDED":
-      return "Funds reserved";
+      return "Awaiting baseline";
+    case "ACTIVE":
+      return "Rental active";
     case "RETURN_REVIEW":
       return "Return review";
     case "PROPOSAL_PENDING":
@@ -84,6 +90,7 @@ function getProgress(status: DemoSnapshot["agreement"]["status"]) {
   if (status === "AWAITING_FUNDING") return 2;
   if (
     status === "FUNDED" ||
+    status === "ACTIVE" ||
     status === "RETURN_REVIEW" ||
     status === "PROPOSAL_PENDING"
   )
@@ -127,6 +134,8 @@ export default function DemoWorkspace() {
     return () => window.removeEventListener("storage", onStorage);
   }, [hydrated, repository]);
 
+  const latestSnapshot = useRef(snapshot);
+  latestSnapshot.current = snapshot;
   const actor = actorForId(snapshot.activeActorId);
   const agreement = snapshot.agreement;
   const progress = getProgress(agreement.status);
@@ -138,17 +147,35 @@ export default function DemoWorkspace() {
     action: (current: DemoSnapshot, currentActor: PactActor) => DemoSnapshot,
   ) {
     try {
-      const next = action(snapshot, actor);
+      const latest = latestSnapshot.current;
+      if (
+        latest.agreement.id !== snapshot.agreement.id ||
+        latest.activeActorId !== actor.id
+      )
+        throw new Error(
+          "The agreement or identity changed. Review the current screen before continuing.",
+        );
+      const next = action(latest, actor);
+      latestSnapshot.current = next;
       setSnapshot(next);
       setNotice("");
       void repository.save(next);
+      return true;
     } catch (error) {
       setNotice(
         error instanceof Error
           ? error.message
           : "That action could not be completed.",
       );
+      return false;
     }
+  }
+
+  function commitHandover(action: Parameters<typeof commit>[0]) {
+    if (!commit(action))
+      throw new Error(
+        "The condition record was not saved. Review the current agreement and retry.",
+      );
   }
 
   async function switchIdentity(role: "landlord" | "tenant") {
@@ -497,26 +524,22 @@ export default function DemoWorkspace() {
                     text="The agreed amount will appear as reserved demo funds. It is not spendable by either party."
                   />
                 ))}
-              {agreement.status === "FUNDED" &&
-                (actor.role === "tenant" ? (
-                  <ActionPanel
-                    description="When the rental ends, record the return to start the agreed review step."
-                    onClick={() =>
-                      commit((current, currentActor) =>
-                        submitReturn(current, currentActor),
-                      )
-                    }
-                    title="Deposit reserved in the demo ledger"
-                    buttonLabel={`Record ${agreement.assetType === "APARTMENT" ? "apartment" : "equipment"} return`}
-                    icon={<KeyRound size={17} />}
-                  />
-                ) : (
-                  <WaitingCard
-                    icon={<LockKeyhole size={17} />}
-                    title="Deposit is reserved"
-                    text="The landlord cannot take the demo funds. The tenant records the return to begin review."
-                  />
-                ))}
+              {(agreement.status === "FUNDED" ||
+                agreement.status === "ACTIVE") && (
+                <WaitingCard
+                  icon={<KeyRound size={17} />}
+                  title={
+                    agreement.status === "ACTIVE"
+                      ? "Rental active"
+                      : "Funded � awaiting condition baseline"
+                  }
+                  text={
+                    agreement.status === "ACTIVE"
+                      ? "Use the condition record below to document the return. The first declaration starts one 48-hour review window."
+                      : "The owner records the initial condition below. Both parties must acknowledge the same baseline before the rental activates."
+                  }
+                />
+              )}
               {agreement.status === "RETURN_REVIEW" &&
                 (actor.role === "landlord" ? (
                   <div className="proposal-panel">
@@ -779,6 +802,27 @@ export default function DemoWorkspace() {
           </aside>
         </div>
 
+        <HandoverWorkspace
+          key={agreement.id}
+          agreement={agreement}
+          actor={actor}
+          onBaselineChange={(record) =>
+            commitHandover((current, currentActor) =>
+              recordBaseline(current, currentActor, record),
+            )
+          }
+          onSubmitReturn={(record) =>
+            commitHandover((current, currentActor) =>
+              submitReturn(current, currentActor, record),
+            )
+          }
+          onSubmitInspection={(record) =>
+            commitHandover((current, currentActor) =>
+              recordArrivalInspection(current, currentActor, record),
+            )
+          }
+        />
+
         <section
           aria-labelledby="activity-heading"
           className="activity-card"
@@ -1028,7 +1072,9 @@ function nextActionText(
         ? "Reserve the demo deposit"
         : "Waiting for simulated funding";
     case "FUNDED":
-      return "Record the apartment return";
+      return "Record and acknowledge the condition baseline";
+    case "ACTIVE":
+      return "Document the return when the rental ends";
     case "RETURN_REVIEW":
       return role === "landlord"
         ? "Approve a refund or propose a split"
@@ -1049,7 +1095,7 @@ function nextActorText(
   if (status === "AWAITING_ACCEPTANCE")
     return role === "tenant" ? "Luca Martin · Tenant" : "Luca Martin · Tenant";
   if (status === "AWAITING_FUNDING") return "Luca Martin · Tenant";
-  if (status === "FUNDED") return "Luca Martin · Tenant";
+  if (status === "FUNDED" || status === "ACTIVE") return "Luca Martin · Tenant";
   if (status === "RETURN_REVIEW") return "Maya Petrova · Landlord";
   if (status === "PROPOSAL_PENDING") return "Luca Martin · Tenant";
   return "Agreement complete";

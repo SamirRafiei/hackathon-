@@ -305,7 +305,7 @@ function ReturnForm(props: ReturnPanelProps & { baseline: BaselineRecord }) {
                     }
                     className="size-4 accent-emerald-800"
                   />
-                  <span>{item.label} returned</span>
+                  <span>Matches baseline: {item.label}</span>
                 </label>
                 <label className="block text-xs text-stone-600">
                   {item.checked
