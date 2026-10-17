@@ -10,7 +10,10 @@ schema integrity and access policies are working implementations.
 [FUNDING.md](./FUNDING.md) for grants, payloads, failure fixtures and local test limits.
 **Stage 2B update:** `cancelAgreement` is implemented by migration 005. See
 [CANCELLATION.md](./CANCELLATION.md) for in-flight reconciliation and refund behavior.
-Other operations below remain implementation contracts.
+**Stage 2C update:** owner full refunds, unanimous/reviewer settlement execution and
+the due-inspection worker are implemented by migration 006. See
+[SETTLEMENTS.md](./SETTLEMENTS.md). Proposal, claim, evidence and reviewer-decision
+creation operations remain separate implementation contracts.
 
 ## Transaction protocol
 
@@ -45,12 +48,13 @@ and RLS alone cannot enforce complete transition rules.
 | `prepareCollection`, `createVerificationChallenge`, `confirmHandover` | Fully funded agreement, any borrower, purpose/expiry/attempt limits and hashed proofs, distinct owner/borrower confirmations of submitted evidence/checklist; scanning is not consent                                      |
 | `prepareEvidenceUpload`, `submitEvidence`                             | Authorized participant/assigned reviewer; reserve random path; verify MIME/size/content/hash and stored object; finalize append-only; permit initial claim evidence before dispute creation                                |
 | `requestReturn`, `acknowledgeReturn`                                  | Either side initiates, any borrower supplies evidence; owner alone acknowledges physical receipt/evidence; set exact 24-hour deadline once; optional in-person code or documented remote pending request                   |
-| `approveFullRefund`                                                   | Owner during inspection, no claim; same unique settlement path as expiry                                                                                                                                                   |
+| `approveFullRefund`                                                   | Implemented in migration 006: owner during inspection, no timely claim; same unique settlement path as expiry                                                                                                              |
 | `openClaim`                                                           | Owner strictly before deadline under expiry lock; amount 0..secured; preserve timestamp/details; link submitted files via `dispute_evidence`; missing initial evidence flags follow-up                                     |
 | `proposeSettlement`, `acceptSettlement`, `rejectSettlement`           | Any participant proposes with reason; immutable new proposal resets approval set; unanimous owner/all-borrower approval; rejection escalates, silence never consents                                                       |
 | `requestReviewEvidence`, `recordReviewerDecision`                     | Live assigned independent reviewer; evidence request keeps restriction; explanation/policy/evidence recorded; deduction capped by claim/secured; receipt determination is distinct                                         |
+| `settleAgreement`                                                     | Implemented in migration 006: consume unanimous current proposal or authorized persisted reviewer financial decision and post final settlement                                                                             |
 | `processDueContributions`                                             | Restricted bounded worker completes persisted attempts without a browser                                                                                                                                                   |
-| `processDueInspections`                                               | Restricted bounded scheduler; no timely claim and deadline reached; same settlement as early refund; no duplicate disposition                                                                                              |
+| `processDueInspections`                                               | Implemented in migration 006: restricted bounded scheduler; no timely claim and deadline reached; same settlement as early refund; no duplicate disposition                                                                |
 | `escalateDueCases`                                                    | Pending receipt older than 24 hours or negotiation rejection/24-hour expiry; create attention without assuming receipt or awarding money                                                                                   |
 | `processReturnReminders`                                              | Deduplicated 24-hour/1-hour reminders only when scheduled in future; overdue active-return flags; no automatic forfeiture                                                                                                  |
 

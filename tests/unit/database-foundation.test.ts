@@ -44,7 +44,9 @@ type FundingResult = OperationResult<
   OperationOutput<"startContribution"> &
     OperationOutput<"completeSimulatedContribution"> &
     OperationOutput<"processDueContributions"> &
-    OperationOutput<"cancelAgreement">
+    OperationOutput<"cancelAgreement"> &
+    OperationOutput<"approveFullRefund"> &
+    OperationOutput<"settleAgreement">
 >;
 async function fundingCall(
   name: string,
@@ -106,6 +108,102 @@ async function cancelAgreement(actor = borrower, key = "cancel-1") {
     expectedRevision: revision,
     idempotencyKey: key,
   });
+}
+async function approveRefund(actor = owner, key = "refund-1") {
+  await db.exec("reset role");
+  const revision = (
+    await db.query<{ revision: string }>(
+      `select revision::text from public.agreements where id='${agreement}'`,
+    )
+  ).rows[0].revision;
+  await asUser(actor);
+  return fundingCall("approve_full_refund", {
+    agreementId: agreement,
+    expectedRevision: revision,
+    idempotencyKey: key,
+  });
+}
+async function settleAgreement(
+  input:
+    | { kind: "proposal"; proposalId: string }
+    | { kind: "reviewer_decision"; caseId: string },
+  actor: string,
+  key = "settle-1",
+) {
+  await db.exec("reset role");
+  const revision = (
+    await db.query<{ revision: string }>(
+      `select revision::text from public.agreements where id='${agreement}'`,
+    )
+  ).rows[0].revision;
+  await asUser(actor);
+  return fundingCall("settle_agreement", {
+    agreementId: agreement,
+    expectedRevision: revision,
+    idempotencyKey: key,
+    ...input,
+  });
+}
+async function processDueInspections(key = "inspection-batch", batchSize = 10) {
+  await db.exec("reset role; set local role service_role");
+  return fundingCall("process_due_inspections", {
+    batchSize,
+    idempotencyKey: key,
+  });
+}
+async function secureForSettlement(
+  state: "inspecting" | "disputed" | "settling" = "inspecting",
+  expired = false,
+) {
+  const returnTime = expired ? "now()-interval '25 hours'" : "now()";
+  await db.exec(`reset role;
+    insert into public.operation_requests(
+      id,agreement_id,actor_scope,operation,idempotency_key,payload_hash,status,result,completed_at
+    ) values
+      ('${uid(720)}','${agreement}','scheduler:complete_payments','completeSimulatedContribution','fixture-fund-1',repeat('c',64),'succeeded','{}',now()),
+      ('${uid(721)}','${agreement}','scheduler:complete_payments','completeSimulatedContribution','fixture-fund-2',repeat('d',64),'succeeded','{}',now());
+    insert into public.payment_attempts(
+      id,agreement_id,contribution_id,operation_id,state,due_at,completed_at
+    ) values
+      ('${uid(820)}','${agreement}','${contribution}','${uid(720)}','succeeded',now(),now()),
+      ('${uid(821)}','${agreement}','${secondContribution}','${uid(721)}','succeeded',now(),now());
+    insert into public.ledger_transactions(
+      id,agreement_id,currency,operation_id,kind,payment_attempt_id
+    ) values
+      ('${uid(920)}','${agreement}','EUR','${uid(720)}','funding','${uid(820)}'),
+      ('${uid(921)}','${agreement}','EUR','${uid(721)}','funding','${uid(821)}');
+    insert into public.ledger_entries(
+      agreement_id,transaction_id,currency,account,contribution_id,amount_minor
+    ) values
+      ('${agreement}','${uid(920)}','EUR','simulated_source','${contribution}',-15000),
+      ('${agreement}','${uid(920)}','EUR','restricted_deposit',null,15000),
+      ('${agreement}','${uid(921)}','EUR','simulated_source','${secondContribution}',-10000),
+      ('${agreement}','${uid(921)}','EUR','restricted_deposit',null,10000);
+    update public.contributions set state='secured',secured_minor=amount_minor
+      where agreement_id='${agreement}';
+    update public.agreements set state='${state}',terms_frozen_at=now(),handover_at=${returnTime},
+      returned_at=${returnTime},inspection_deadline=${returnTime}+interval '24 hours'
+      where id='${agreement}';`);
+}
+async function addProposal(
+  deductionMinor = 8000,
+  acceptActors = [owner, borrower, secondBorrower],
+) {
+  await db.exec(`reset role;
+    insert into public.disputes(
+      id,agreement_id,opened_by,requested_minor,reason,state
+    ) values ('${uid(530)}','${agreement}','${owner}',${deductionMinor},'Damage claim','negotiating');
+    insert into public.settlement_proposals(
+      id,agreement_id,dispute_id,proposed_by,deduction_minor,reason
+    ) values ('${uid(531)}','${agreement}','${uid(530)}','${owner}',${deductionMinor},'Agreed deduction');
+    update public.disputes set current_proposal_id='${uid(531)}' where id='${uid(530)}';
+    ${acceptActors
+      .map(
+        (actor) =>
+          `insert into public.proposal_acceptances(agreement_id,proposal_id,actor_id,decision)
+           values ('${agreement}','${uid(531)}','${actor}','accepted');`,
+      )
+      .join("\n")}`);
 }
 const waitForDue = () => new Promise((resolve) => setTimeout(resolve, 2100));
 
@@ -685,6 +783,361 @@ describe("Stage 2 funding and cancellation", () => {
     expect(await startFunding()).toMatchObject({
       ok: false,
       error: { code: "acceptances_required" },
+    });
+  });
+
+  describe("Stage 2C full and partial settlements", () => {
+    it("proportionally allocates an EUR 80 deduction on EUR 250 at 60/40", async () => {
+      await secureForSettlement("disputed");
+      await addProposal();
+      const result = successful(
+        await settleAgreement(
+          { kind: "proposal", proposalId: uid(531) },
+          secondBorrower,
+        ),
+      );
+      expect(result.agreement.state).toBe("completed");
+      await db.exec("reset role; set constraints all immediate");
+      expect(
+        (
+          await db.query(
+            "select secured_minor,owner_minor,refunded_minor,reason from public.settlements",
+          )
+        ).rows,
+      ).toEqual([
+        {
+          secured_minor: 25000,
+          owner_minor: 8000,
+          refunded_minor: 17000,
+          reason: "unanimous_proposal",
+        },
+      ]);
+      expect(
+        (
+          await db.query(
+            `select c.id,a.deducted_minor,a.refunded_minor,c.state
+             from public.settlement_allocations a
+             join public.contributions c on c.id=a.contribution_id order by c.id`,
+          )
+        ).rows,
+      ).toEqual([
+        {
+          id: contribution,
+          deducted_minor: 4800,
+          refunded_minor: 10200,
+          state: "partially_refunded",
+        },
+        {
+          id: secondContribution,
+          deducted_minor: 3200,
+          refunded_minor: 6800,
+          state: "partially_refunded",
+        },
+      ]);
+      expect(
+        (
+          await db.query(
+            `select account,contribution_id,amount_minor from public.ledger_entries
+             where transaction_id=(select id from public.ledger_transactions where kind='settlement')
+             order by account::text,contribution_id nulls first`,
+          )
+        ).rows,
+      ).toEqual([
+        {
+          account: "borrower_refund",
+          contribution_id: contribution,
+          amount_minor: 10200,
+        },
+        {
+          account: "borrower_refund",
+          contribution_id: secondContribution,
+          amount_minor: 6800,
+        },
+        {
+          account: "owner_allocation",
+          contribution_id: null,
+          amount_minor: 8000,
+        },
+        {
+          account: "restricted_deposit",
+          contribution_id: null,
+          amount_minor: -25000,
+        },
+      ]);
+      expect(
+        (
+          await db.query(
+            "select sum(amount_minor)::integer as balance from public.ledger_entries",
+          )
+        ).rows,
+      ).toEqual([{ balance: 0 }]);
+      expect(
+        (
+          await db.query(
+            `select state from public.disputes where id='${uid(530)}'`,
+          )
+        ).rows,
+      ).toEqual([{ state: "resolved" }]);
+      expect(
+        (
+          await db.query(
+            "select action from public.audit_events where action='agreement_settled'",
+          )
+        ).rows,
+      ).toEqual([{ action: "agreement_settled" }]);
+    });
+
+    it("requires every participant to accept the current proposal and protects settlement from unauthorized users", async () => {
+      await secureForSettlement("disputed");
+      await addProposal(8000, [owner, borrower]);
+      expect(
+        await settleAgreement(
+          { kind: "proposal", proposalId: uid(531) },
+          stranger,
+        ),
+      ).toMatchObject({ ok: false, error: { code: "not_authorized" } });
+      expect(
+        await settleAgreement(
+          { kind: "proposal", proposalId: uid(531) },
+          owner,
+        ),
+      ).toMatchObject({ ok: false, error: { code: "acceptances_required" } });
+      await db.exec(`reset role; insert into public.proposal_acceptances(
+        agreement_id,proposal_id,actor_id,decision
+      ) values ('${agreement}','${uid(531)}','${secondBorrower}','accepted')`);
+      expect(
+        successful(
+          await settleAgreement(
+            { kind: "proposal", proposalId: uid(531) },
+            owner,
+          ),
+        ).agreement.state,
+      ).toBe("completed");
+    });
+
+    it("replays the same settlement idempotency key and rejects a second disposition", async () => {
+      await secureForSettlement("disputed");
+      await addProposal();
+      await db.exec("reset role");
+      const revision = (
+        await db.query<{ revision: string }>(
+          `select revision::text from public.agreements where id='${agreement}'`,
+        )
+      ).rows[0].revision;
+      const input = {
+        agreementId: agreement,
+        expectedRevision: revision,
+        idempotencyKey: "same-settlement",
+        kind: "proposal",
+        proposalId: uid(531),
+      };
+      await asUser(borrower);
+      const first = await fundingCall("settle_agreement", input);
+      expect(successful(first).agreement.state).toBe("completed");
+      expect(await fundingCall("settle_agreement", input)).toEqual({
+        ...first,
+        replayed: true,
+      });
+      expect(
+        await fundingCall("settle_agreement", {
+          ...input,
+          idempotencyKey: "duplicate-disposition",
+        }),
+      ).toMatchObject({
+        ok: false,
+        error: { code: "already_processed" },
+      });
+      await db.exec("reset role");
+      expect(await count("settlements")).toBe(1);
+      expect(await count("ledger_transactions")).toBe(3);
+      expect(await count("ledger_entries")).toBe(8);
+    });
+
+    it("allows only the owner to approve an unclaimed full refund", async () => {
+      await secureForSettlement("inspecting");
+      expect(await approveRefund(borrower)).toMatchObject({
+        ok: false,
+        error: { code: "not_authorized" },
+      });
+      expect(successful(await approveRefund(owner)).agreement.state).toBe(
+        "completed",
+      );
+      await db.exec("reset role; set constraints all immediate");
+      expect(
+        (
+          await db.query(
+            "select reason,secured_minor,owner_minor,refunded_minor from public.settlements",
+          )
+        ).rows,
+      ).toEqual([
+        {
+          reason: "early_refund",
+          secured_minor: 25000,
+          owner_minor: 0,
+          refunded_minor: 25000,
+        },
+      ]);
+      expect(
+        (
+          await db.query(
+            "select state,refunded_minor,deducted_minor from public.contributions order by id",
+          )
+        ).rows,
+      ).toEqual([
+        { state: "refunded", refunded_minor: 15000, deducted_minor: 0 },
+        { state: "refunded", refunded_minor: 10000, deducted_minor: 0 },
+      ]);
+      expect(await count("ledger_entries")).toBe(7);
+    });
+
+    it("does not release a timely claimed deposit during owner approval or inspection expiry", async () => {
+      await secureForSettlement("inspecting", true);
+      const returnedAt = (
+        await db.query<{ returned_at: string }>(
+          `select returned_at::text from public.agreements where id='${agreement}'`,
+        )
+      ).rows[0].returned_at;
+      await db.exec(`reset role;
+        insert into public.disputes(
+          id,agreement_id,opened_by,requested_minor,reason,created_at,negotiation_deadline
+        ) values (
+          '${uid(530)}','${agreement}','${owner}',8000,'Timely damage claim',
+          '${returnedAt}'::timestamptz+interval '23 hours',
+          '${returnedAt}'::timestamptz+interval '47 hours'
+        )`);
+      expect(await approveRefund(owner)).toMatchObject({
+        ok: false,
+        error: { code: "claim_open" },
+      });
+      expect(successful(await processDueInspections()).processedCount).toBe(0);
+      await db.exec("reset role");
+      expect(
+        (
+          await db.query(
+            `select state from public.agreements where id='${agreement}'`,
+          )
+        ).rows,
+      ).toEqual([{ state: "inspecting" }]);
+      expect(await count("settlements")).toBe(0);
+      expect(await count("ledger_entries")).toBe(4);
+    });
+
+    it("automatically fully refunds due inspection agreements and replays bounded worker calls", async () => {
+      await secureForSettlement("inspecting", true);
+      const first = await processDueInspections("expiry-run", 1);
+      expect(successful(first)).toMatchObject({
+        processedCount: 1,
+        hasMore: false,
+      });
+      expect(await processDueInspections("expiry-run", 1)).toEqual({
+        ...first,
+        replayed: true,
+      });
+      await db.exec("reset role; set constraints all immediate");
+      expect(
+        (
+          await db.query(
+            "select reason,secured_minor,refunded_minor from public.settlements",
+          )
+        ).rows,
+      ).toEqual([
+        {
+          reason: "inspection_expired",
+          secured_minor: 25000,
+          refunded_minor: 25000,
+        },
+      ]);
+      expect(
+        (
+          await db.query(
+            `select state from public.agreements where id='${agreement}'`,
+          )
+        ).rows,
+      ).toEqual([{ state: "completed" }]);
+      expect(await count("ledger_transactions")).toBe(3);
+      expect(await count("ledger_entries")).toBe(7);
+    });
+
+    it("settles only a final independent reviewer financial decision", async () => {
+      await secureForSettlement("disputed");
+      await db.exec(`reset role;
+        insert into public.disputes(
+          id,agreement_id,opened_by,requested_minor,reason,state
+        ) values ('${uid(530)}','${agreement}','${owner}',8000,'Damage claim','in_review');
+        update public.review_cases set dispute_id='${uid(530)}' where id='${reviewCase}';
+        insert into public.reviewer_decisions(
+          agreement_id,case_id,reviewer_id,kind,deduction_minor,explanation,policy_basis
+        ) values ('${agreement}','${reviewCase}','${reviewer}','financial',8000,'Damage confirmed','Pact policy');`);
+      expect(
+        await settleAgreement(
+          { kind: "reviewer_decision", caseId: reviewCase },
+          borrower,
+        ),
+      ).toMatchObject({ ok: false, error: { code: "not_authorized" } });
+      expect(
+        successful(
+          await settleAgreement(
+            { kind: "reviewer_decision", caseId: reviewCase },
+            reviewer,
+          ),
+        ).agreement.state,
+      ).toBe("completed");
+      await db.exec("reset role; set constraints all immediate");
+      expect(
+        (
+          await db.query(
+            "select reason,owner_minor,refunded_minor from public.settlements",
+          )
+        ).rows,
+      ).toEqual([
+        {
+          reason: "reviewer_decision",
+          owner_minor: 8000,
+          refunded_minor: 17000,
+        },
+      ]);
+      expect(
+        (
+          await db.query(
+            "select state,resolved_at is not null as resolved from public.review_cases",
+          )
+        ).rows,
+      ).toEqual([{ state: "resolved", resolved: true }]);
+    });
+
+    it("rolls back settlement ledger and state when audit writing fails", async () => {
+      await secureForSettlement("inspecting");
+      await db.exec(`reset role;
+        create function pg_temp.fail_settlement_audit() returns trigger language plpgsql as $$ begin
+          if new.action='agreement_settled' then raise exception 'settlement_audit_failure'; end if; return new; end $$;
+        create trigger test_settlement_audit before insert on public.audit_events
+          for each row execute function pg_temp.fail_settlement_audit();`);
+      await db.exec("savepoint settlement_rollback");
+      await expect(approveRefund(owner)).rejects.toThrow(
+        "settlement_audit_failure",
+      );
+      await db.exec("rollback to savepoint settlement_rollback; reset role");
+      expect(await count("settlements")).toBe(0);
+      expect(await count("settlement_allocations")).toBe(0);
+      expect(await count("ledger_transactions")).toBe(2);
+      expect(await count("ledger_entries")).toBe(4);
+      expect(
+        (
+          await db.query(
+            `select state,refunded_minor,deducted_minor from public.contributions order by id`,
+          )
+        ).rows,
+      ).toEqual([
+        { state: "secured", refunded_minor: 0, deducted_minor: 0 },
+        { state: "secured", refunded_minor: 0, deducted_minor: 0 },
+      ]);
+      expect(
+        (
+          await db.query(
+            `select state from public.agreements where id='${agreement}'`,
+          )
+        ).rows,
+      ).toEqual([{ state: "inspecting" }]);
     });
   });
 

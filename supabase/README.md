@@ -9,7 +9,8 @@ permissions, defaults, migration commands and verification limits. Read
 product data and credentials. No hosted project has been provisioned, linked or
 modified. Stage 2A adds [simulated funding RPCs and a bounded worker](./FUNDING.md);
 Stage 2B adds [atomic pre-handover cancellation and refunds](./CANCELLATION.md).
-Other workflow RPCs and scheduled deployment remain pending.
+Stage 2C adds [full and partial settlement RPCs](./SETTLEMENTS.md). Other workflow
+RPCs and scheduled deployment remain pending.
 
 Run `npm test` or `npm run test:db` for executable embedded PostgreSQL verification
 without Docker. With the actual local Supabase stack running, apply migrations and

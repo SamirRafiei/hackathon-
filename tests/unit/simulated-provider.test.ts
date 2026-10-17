@@ -130,6 +130,69 @@ describe("server-only simulated provider", () => {
     });
     expect(rpc).not.toHaveBeenCalled();
   });
+  it("routes settlement approvals to the caller transport and inspection expiry to the worker", async () => {
+    const user = vi.fn().mockResolvedValue({
+      error: null,
+      data: {
+        ok: true,
+        replayed: false,
+        data: { agreement, operationId: id },
+      },
+    });
+    const worker = vi.fn().mockResolvedValue({
+      error: null,
+      data: {
+        ok: true,
+        replayed: false,
+        data: { jobRunId: id, processedCount: 1, hasMore: false },
+      },
+    });
+    const provider = new SimulatedDepositProvider(user, worker);
+    const mutation = {
+      agreementId: id,
+      expectedRevision: "1",
+      idempotencyKey: "settlement-1",
+    };
+    expect(await provider.approveFullRefund(mutation)).toMatchObject({
+      ok: true,
+    });
+    expect(
+      await provider.settle({
+        ...mutation,
+        kind: "proposal",
+        proposalId: id,
+      }),
+    ).toMatchObject({ ok: true });
+    expect(
+      await provider.processDueInspections({
+        batchSize: 10,
+        idempotencyKey: "inspection-1",
+      }),
+    ).toMatchObject({ ok: true });
+    expect(user.mock.calls.map((call) => call[0])).toEqual([
+      "approve_full_refund",
+      "settle_agreement",
+    ]);
+    expect(worker.mock.calls.map((call) => call[0])).toEqual([
+      "process_due_inspections",
+    ]);
+    expect(
+      await provider.settle({
+        ...mutation,
+        kind: "proposal",
+        proposalId: id,
+        caseId: id,
+      } as typeof mutation & {
+        kind: "proposal";
+        proposalId: string;
+        caseId: string;
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: { code: "validation_failed" },
+    });
+    expect(user).toHaveBeenCalledTimes(2);
+  });
   it("returns safe errors without exposing database or transport internals", async () => {
     const rpc = vi
       .fn()

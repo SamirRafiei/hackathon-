@@ -17,6 +17,9 @@ export type FundingRpc = (
   name:
     | "start_contribution"
     | "cancel_agreement"
+    | "approve_full_refund"
+    | "settle_agreement"
+    | "process_due_inspections"
     | "complete_simulated_contribution"
     | "process_due_contributions",
   args: { p_input: unknown },
@@ -60,6 +63,23 @@ const completeOutput = transitionSchema.extend({
   attemptId: participantIdSchema,
   attemptState: z.enum(["succeeded", "failed", "cancelled"]),
 });
+const settleSchema = mutationInputSchema
+  .extend({
+    kind: z.enum(["proposal", "reviewer_decision"]),
+    proposalId: participantIdSchema.optional(),
+    caseId: participantIdSchema.optional(),
+  })
+  .strict()
+  .superRefine((input, ctx) => {
+    if (
+      (input.kind === "proposal" &&
+        (!input.proposalId || input.caseId !== undefined)) ||
+      (input.kind === "reviewer_decision" &&
+        (!input.caseId || input.proposalId !== undefined))
+    ) {
+      ctx.addIssue({ code: "custom", message: "Invalid settlement reference" });
+    }
+  });
 const batchOutput = z.object({
   jobRunId: participantIdSchema,
   processedCount: z.number().int().nonnegative(),
@@ -77,6 +97,8 @@ const errorSchema = z.object({
       "stale_revision",
       "invalid_state",
       "acceptances_required",
+      "claim_open",
+      "funding_incomplete",
       "idempotency_conflict",
       "already_processed",
       "temporarily_unavailable",
@@ -143,6 +165,40 @@ export class SimulatedDepositProvider implements DepositProvider {
     const parsed = mutationInputSchema.safeParse(input);
     return parsed.success
       ? invoke(this.userRpc, "cancel_agreement", parsed.data, transitionSchema)
+      : failure("validation_failed");
+  }
+  async approveFullRefund(
+    input: OperationInput<"approveFullRefund">,
+  ): Promise<OperationResult<OperationOutput<"approveFullRefund">>> {
+    const parsed = mutationInputSchema.safeParse(input);
+    return parsed.success
+      ? invoke(
+          this.userRpc,
+          "approve_full_refund",
+          parsed.data,
+          transitionSchema,
+        )
+      : failure("validation_failed");
+  }
+  async settle(
+    input: OperationInput<"settleAgreement">,
+  ): Promise<OperationResult<OperationOutput<"settleAgreement">>> {
+    const parsed = settleSchema.safeParse(input);
+    return parsed.success
+      ? invoke(this.userRpc, "settle_agreement", parsed.data, transitionSchema)
+      : failure("validation_failed");
+  }
+  async processDueInspections(
+    input: OperationInput<"processDueInspections">,
+  ): Promise<OperationResult<OperationOutput<"processDueInspections">>> {
+    const parsed = batchSchema.safeParse(input);
+    return parsed.success
+      ? invoke(
+          this.workerRpc,
+          "process_due_inspections",
+          parsed.data,
+          batchOutput,
+        )
       : failure("validation_failed");
   }
   async complete(

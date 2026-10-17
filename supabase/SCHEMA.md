@@ -1,7 +1,9 @@
 # PACT schema v1
 
-Stage 1 provides structure, integrity, access, allocation and contracts. It does not
-expose business mutation RPCs or run financial jobs. All money is simulated.
+Migrations 001–003 provide the schema, integrity and access foundation. Migrations
+004–006 implement simulated funding, pre-handover cancellation and full/partial
+settlements. All money is simulated; scheduled routines are callable but are not
+configured with a Cron schedule here.
 
 ## Apply and verify
 
@@ -10,6 +12,9 @@ Apply migrations in timestamp order:
 1. `20261017000100_schema_v1.sql`: enums, 31 tables, keys, checks, indexes, RLS and revoked API grants.
 2. `20261017000200_integrity.sql`: allocation, immutable history, snapshot/ledger/settlement integrity triggers.
 3. `20261017000300_access.sql`: identity-bound read policies, limited safe writes, private evidence bucket/policies.
+4. `20261017000400_simulated_funding.sql`: borrower funding, trusted payment completion and bounded payment worker.
+5. `20261017000500_cancellation.sql`: atomic pre-handover cancellation and contribution refunds.
+6. `20261017000600_settlements.sql`: owner/expiry full refunds, unanimous/reviewer disposition and proportional allocations.
 
 Each migration is transactional. They target a fresh Supabase PostgreSQL 17 project
 with its existing `auth` and `storage` schemas. These are recorded ordered migrations,
@@ -77,8 +82,8 @@ Account deletion/anonymization needs a separately reviewed policy.
 - Receipt requires exactly `returned_at + interval '24 hours'`. Once recorded,
   receipt/deadline cannot change. The future operation supplies server time.
 - Agreement updates increment `revision`. Enums/checks enforce representation and
-  required timestamps. **Legal transition edges and funding/consent gates still
-  require Stage 2 RPCs**; direct client state writes remain blocked meanwhile.
+  required timestamps. Stage 2 RPCs implement funding, cancellation and settlement
+  transitions; other legal transition edges and consent gates remain future work.
 - Funded/frozen agreements reject participant and published-term changes.
 - Versions, snapshot rows, acceptances, proposals/votes, decisions/evidence references,
   settlements/allocations, ledger and audit records are append-only.
@@ -93,10 +98,12 @@ Account deletion/anonymization needs a separately reviewed policy.
   cannot exceed the recorded claim or secured funds. Receipt decisions are distinct.
 
 Example postings: funding has source `-15000`, restricted `+15000`; settlement has
-restricted `-25000`, refunds `+10200/+6800`, owner `+8000`. Stage 2 must enforce
-aggregate-to-ledger reconciliation, per-account balances, all-party consent, capped
-proportional deductions and atomic unique disposition. Balanced rows alone do not
-authorize payment. Unresolved cases must never produce automatic payouts.
+restricted `-25000`, refunds `+10200/+6800`, owner `+8000`. Migration 006 enforces
+atomic unique disposition and proportional integer-minor-unit deductions with a
+stable participant-ID tie-break. Settlement execution requires a unanimous current
+proposal or an authorized persisted reviewer financial decision; inspection expiry
+cannot release a timely claimed deposit. Balanced rows alone do not authorize
+payment. Unresolved cases must never produce automatic payouts.
 
 ## Access matrix
 
