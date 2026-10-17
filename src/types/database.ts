@@ -1,12 +1,92 @@
-/**
- * Empty-schema placeholder, not a definition of Pact's domain model.
- * Sameer replaces this using `npm run db:types` after adding migrations.
- */
+/** Generated-function subset for the agreement setup RPC migration. */
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
+type Table<Row> = {
+  Row: Row;
+  Insert: Partial<Row>;
+  Update: Partial<Row>;
+  Relationships: [];
+};
+
+type AgreementState =
+  | "draft"
+  | "awaiting_acceptance"
+  | "awaiting_funding"
+  | "ready_for_handover"
+  | "active"
+  | "return_requested"
+  | "inspecting"
+  | "disputed"
+  | "settling"
+  | "completed"
+  | "cancelling"
+  | "cancelled";
+
 export type Database = {
   public: {
-    Tables: Record<string, never>;
+    Tables: {
+      agreements: Table<{
+        id: string;
+        owner_id: string;
+        currency: "EUR" | "USD" | "GBP";
+        state: AgreementState;
+        current_version_id: string | null;
+        revision: number;
+        created_at: string;
+        updated_at: string;
+      }>;
+      agreement_versions: Table<{
+        id: string;
+        agreement_id: string;
+        owner_id: string;
+        version_number: number;
+        currency: "EUR" | "USD" | "GBP";
+        deposit_minor: number;
+        item_name: string;
+        item_description: string;
+        terms: string;
+        starts_at: string;
+        due_at: string;
+        published_at: string;
+      }>;
+      participants: Table<{
+        id: string;
+        agreement_id: string;
+        user_id: string | null;
+        email: string;
+        share_bps: number;
+        allocated_minor: number;
+        joined_at: string | null;
+        removed_at: string | null;
+      }>;
+      acceptances: Table<{
+        agreement_id: string;
+        version_id: string;
+        actor_id: string;
+        accepted_at: string;
+      }>;
+      profiles: Table<{
+        id: string;
+        display_name: string;
+        created_at: string;
+      }>;
+    };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      ensure_profile: {
+        Args: { p_display_name?: string | null };
+        Returns: Json;
+      };
+      create_agreement: { Args: { p_input: Json }; Returns: Json };
+      claim_invitation: { Args: { p_input: Json }; Returns: Json };
+      accept_agreement_version: { Args: { p_input: Json }; Returns: Json };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

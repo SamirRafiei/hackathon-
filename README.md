@@ -28,14 +28,14 @@ This identity switch is a demo control, not sign-in or proof of identity. Anyone
 
 ```text
 src/
-  app/                 App Router entry, global styles, reserved route folders
+  app/                 App Router entry and global styles
   components/ui/       Shared accessible UI components
   features/
     demo/               Seeded agreement, local demo repository, interactive workflow
     agreements/        Local demo setup form; authenticated persistence is pending
-    deposits/          Reserved for future provider, persistent funding, transaction history
-    handover/          Condition evidence, QR/code, collection, return
-    disputes/          Claims, negotiation, reviewer workspace
+    deposits/          Deposit-provider contracts and simulated funding operations
+    handover/          Planned condition evidence, collection and return workflows
+    disputes/          Planned claims, negotiation and reviewer workspace
   lib/
     auth/              Identity-provider boundary; current fake demo identities
     domain/            Shared validation, agreement contracts, allocation and provider boundary
@@ -46,7 +46,6 @@ src/
 supabase/              Local configuration, ordered schema/access/operation migrations and docs
 scripts/               Database type-generation utility
 tests/unit/            Demo, domain, simulated provider and embedded PostgreSQL tests
-tests/e2e/             Future Playwright transaction journeys
 public/                Static assets
 ```
 

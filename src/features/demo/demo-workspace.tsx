@@ -259,6 +259,9 @@ export default function DemoWorkspace() {
               <span>Tenant</span>
             </button>
           </fieldset>
+          <a className="account-entry" href="/agreements/new">
+            Use account
+          </a>
         </div>
       </header>
 

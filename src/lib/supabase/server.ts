@@ -20,8 +20,9 @@ export async function createClient() {
             cookieStore.set(name, value, options);
           });
         } catch {
-          // Server Components cannot write cookies. The auth workstream must
-          // add the documented Proxy refresh before enabling authenticated flows.
+          // Server Components cannot write cookies. The root Proxy refreshes
+          // sessions before rendering; Server Actions and Route Handlers can
+          // persist cookies through this adapter.
         }
       },
     },
