@@ -6,7 +6,7 @@ Pact is a prototype for making rental deposits easier to understand and settle f
 
 The idea can fit inside a banking app or another trusted host experience. This standalone prototype has no banking-provider integration and does not hold, move, or protect real money.
 
-The repository also contains a backend foundation from `feat/core-ledger`: validated domain contracts, PostgreSQL migrations, access/storage policies, and simulated funding/cancellation operations. These are not connected to the interactive demo yet.
+The repository includes a Supabase-backed account flow for email/password sign-in, agreement creation, invitation claiming, and exact-version acceptance. The separate landing-page walkthrough remains browser-local. Database migrations also define the broader ledger and simulated funding/cancellation foundation; funding and the remaining rental lifecycle are not connected to the account flow yet.
 
 ## Start locally
 
@@ -22,13 +22,13 @@ npm run dev
 
 Open http://localhost:3000. The demo works without Docker, Supabase credentials, or an account. Use the landlord/tenant switcher to walk through the seeded agreement or create a local apartment/equipment agreement. Demo choices, condition records, and activity are saved in that browser's local storage. Actual photo files are stored in IndexedDB and survive reloads. Two different browsers do not share data; clearing browser storage removes the demo and its evidence.
 
-This identity switch is a demo control, not sign-in or proof of identity. Anyone can switch between the fake parties. Agreement setup, version acceptance, and activity are saved only in browser local storage and can be changed by the browser user; they are not authoritative records. Do not use real personal information or money. Future host-app integration must verify a signed identity assertion on the server; a browser-provided name, role, or biometric claim is not sufficient. The Supabase factories and database operations remain unused by this demo. Migrations are not applied to a local or hosted database, and server authorization/route wiring remains future work.
+This identity switch is a demo control, not sign-in or proof of identity. Anyone can switch between the fake parties. The landing-page walkthrough stores its agreement and activity in that browser's local storage and is not an authoritative record. The separate account flow uses Supabase Auth and server-side database operations for persistent agreement setup, invited-email claiming, and acceptance. Do not use real money: simulated funding is not connected to a payment provider. A future banking-host integration must verify a signed identity assertion on the server; a browser-provided name, role, or biometric claim is not sufficient.
 
 ## Project structure
 
 ```text
 src/
-  app/                 App Router entry, global styles, reserved route folders
+  app/                 App Router entry and global styles
   components/ui/       Shared accessible UI components
   features/
     demo/               Seeded agreement, local demo repository, interactive workflow
@@ -42,11 +42,11 @@ src/
     supabase/          Browser and server client factories
     env.ts             Lazy public Supabase environment validation
     utils.ts           Tailwind-aware class name helper
-  types/database.ts    Empty generated-schema placeholder
+  types/database.ts    Typed subset of the agreement RPC/database schema
 supabase/              Local configuration, ordered schema/access/operation migrations and docs
 scripts/               Database type-generation utility
 tests/unit/            Demo, domain, simulated provider and embedded PostgreSQL tests
-tests/e2e/             Future Playwright transaction journeys
+tests/e2e/             Playwright configuration for future browser journeys
 public/                Static assets
 ```
 
@@ -116,16 +116,15 @@ npm run db:types
 
 For an existing hosted project, authenticate with `npx supabase login` and generate types using the project reference command above. The project ID flag is explicit; the script does not load `.env.local`. Review and apply migrations only to a project you are authorized to change.
 
-The migrations define agreement/version, acceptance, evidence, dispute, ledger and audit tables, integrity constraints, participant access, private evidence storage, simulated funding and pre-handover cancellation/refund operations. They have not been applied to a Supabase instance, and the browser demo does not call them. Host identity verification, authenticated route/RPC wiring for the full workflow, scheduled deadline processing, hosted reviewer setup, and generated database types remain incomplete. `src/types/database.ts` is still a placeholder. The current agreement remains a local fixture and is not shared between browsers. Use Docker only if you choose to run the local Supabase stack; the app and embedded database tests do not need Docker.
+The migrations define agreement/version, acceptance, evidence, dispute, ledger and audit tables, integrity constraints, participant access, private evidence storage, simulated funding, and pre-handover cancellation/refund operations. The authenticated account flow uses migration `20261017000600_agreement_setup.sql` for agreement creation, invitation claiming, and acceptance. The root walkthrough remains a local fixture and is not shared between browsers. The account flow uses Supabase Auth and server-side authorization; host-app identity assertions, funding-provider integration, handover/return/dispute UI and operations, scheduled deadline processing, and reviewer setup remain future work. `src/types/database.ts` currently contains the typed subset used by the account-flow RPCs; regenerate full database types when schema work stabilizes. Use Docker only if you choose to run the local Supabase stack; the app and embedded database tests do not need Docker.
 
 ## Next implementation steps
 
-1. Keep the current demo provider and local repository restricted to fake data.
-2. Complete authorized server operations and host-identity verification before using real accounts.
-3. Apply the migrations to a disposable Supabase project, review behavior, and generate database types.
-4. Implement the missing agreement lifecycle operations and connect the UI through server routes.
-5. Add hosted/concurrent access and deadline-worker checks before connecting real users or money.
-6. Do not commit local credentials or screenshots containing secrets.
+1. Keep the browser-local walkthrough restricted to fake data.
+2. Complete the remaining handover, return, dispute, and settlement workflow through authorized server operations.
+3. Integrate a real funding provider only after its security, reconciliation, and compliance requirements are defined.
+4. Add hosted/concurrent access and deadline-worker checks before using real funds.
+5. Do not commit local credentials or screenshots containing secrets.
 
 Vercel can use its standard Next.js preset and the repository root. Add the public environment values when backend features are enabled. Deployment, Supabase provisioning, and GitHub branch creation are not performed by this scaffold.
 
