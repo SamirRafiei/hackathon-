@@ -12,6 +12,6 @@ Aiperi's focused negotiation rehearsal is `e2e/equipment-negotiation.spec.ts` (d
 
 ## Valera setup verification
 
-`agreement-setup-form.test.tsx`, `demo-setup-values.test.ts` and `demo-setup-navigation.test.tsx` cover shared apartment/camera defaults, input boundaries and exact-cent parsing, role guards, visible correction/retry, and creation/acceptance without requiring the account preview. The shared fixtures use `src/features/demo/agreement-presets.ts`.
+`agreement-setup-form.test.tsx`, `demo-setup-values.test.ts` and `demo-setup-navigation.test.tsx` cover shared apartment/camera defaults, input boundaries and exact-cent parsing, role guards, visible correction/retry, and creation/acceptance with no account setup preview entry. The shared fixtures use `src/features/demo/agreement-presets.ts`.
 
 `tests/e2e/valera-setup.spec.ts` exercises both examples, invalid dates/fractional cents, role permissions, acceptance and reload at 1280px and 390px. The equipment negotiation journey now explicitly opens Start dispute before each proposal. Run these with the configured Playwright browser on a supported machine. The implementation environment's Chrome aborted at launch, so these new browser runs are not recorded as passing. The 270 unit/component tests and production build passed on the prepared integrated snapshot.

@@ -9,12 +9,13 @@ vi.mock("@/features/handover/handover-workspace", () => ({
 
 describe("local setup entry", () => {
   beforeEach(() => window.localStorage.clear());
-  it("opens and completes local setup without requiring the account preview", async () => {
+  it("opens and completes local setup without an account entry", async () => {
     render(<DemoWorkspace />);
     await screen.findByRole("button", { name: "Accept version 1.0" });
     expect(
-      screen.getByRole("link", { name: "Account setup preview" }),
-    ).toHaveAttribute("href", "/agreements/new");
+      screen.queryByRole("link", { name: "Account setup preview" }),
+    ).not.toBeInTheDocument();
+    expect(document.querySelector('a[href="/agreements/new"]')).toBeNull();
     expect(
       screen.queryByRole("link", { name: "Use account" }),
     ).not.toBeInTheDocument();

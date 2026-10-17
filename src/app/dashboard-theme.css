@@ -87,15 +87,6 @@ main.pact-shell {
   font-size: 11px;
   font-weight: 600;
 }
-.pact-shell .account-entry {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--dashboard-ink);
-}
-
 .pact-shell .workspace {
   width: min(1200px, calc(100% - 64px));
   padding: 48px 0 32px;
@@ -792,10 +783,6 @@ main.pact-shell {
     width: 28px;
     height: 28px;
     font-size: 10px;
-  }
-  .pact-shell .account-entry {
-    font-size: 12px;
-    min-height: 44px;
   }
   .pact-shell .main-nav {
     flex-basis: 100%;

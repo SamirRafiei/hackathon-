@@ -321,13 +321,6 @@ export default function DemoWorkspace() {
               <span>Tenant</span>
             </button>
           </fieldset>
-          <a
-            className="account-entry"
-            href="/agreements/new"
-            title="Separate authenticated setup preview; the complete demo runs here"
-          >
-            Account setup preview
-          </a>
         </div>
       </header>
 

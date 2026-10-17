@@ -11,7 +11,8 @@ for (const width of [1280, 390]) {
     ).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Account setup preview" }),
-    ).toHaveAttribute("href", "/agreements/new");
+    ).toHaveCount(0);
+    await expect(page.locator('a[href="/agreements/new"]')).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "New agreement" }),
     ).toHaveCount(0);

@@ -420,18 +420,6 @@ body {
   box-shadow: 0 0 0 3px #e6f3dd;
 }
 
-.account-entry {
-  color: #315f28;
-  font-size: 12px;
-  font-weight: 700;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.account-entry:hover {
-  text-decoration: underline;
-}
-
 .identity-switch {
   display: flex;
   align-items: center;
