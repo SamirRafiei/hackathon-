@@ -27,6 +27,11 @@ export type BaselinePanelProps = {
   onChange: (record: BaselineRecord) => void;
   storage: EvidenceStorage;
   locked?: boolean;
+  demoPreset?: {
+    identifier: string;
+    notes: string;
+    checklistNotes: string[];
+  };
 };
 
 export function BaselinePanel(props: BaselinePanelProps) {
@@ -52,10 +57,15 @@ function BaselinePanelContent(props: BaselinePanelProps) {
     locked = false,
   } = props;
   const [editing, setEditing] = useState(false);
-  const [identifier, setIdentifier] = useState("");
-  const [notes, setNotes] = useState("");
+  const preset = storage.mode === "browser-demo" ? props.demoPreset : undefined;
+  const [identifier, setIdentifier] = useState(preset?.identifier ?? "");
+  const [notes, setNotes] = useState(preset?.notes ?? "");
   const [checklist, setChecklist] = useState(() =>
-    baselineChecklist(assetType),
+    baselineChecklist(assetType).map((item, index) => ({
+      ...item,
+      checked: !!preset,
+      note: preset?.checklistNotes[index] ?? "",
+    })),
   );
   const [files, setFiles] = useState<EvidenceFile[]>([]);
   const [busy, setBusy] = useState(false);
@@ -261,6 +271,12 @@ function BaselinePanelContent(props: BaselinePanelProps) {
       )}
       {showingEditor && (
         <div className="space-y-4">
+          {preset && (
+            <p className="rounded-xl bg-lime-50 p-3 text-sm text-slate-700">
+              Demo details are prefilled and editable. Review the checklist,
+              upload your photos, then publish the condition record.
+            </p>
+          )}
           <label className="block space-y-1 text-sm font-medium">
             <span>
               {assetType === "APARTMENT"

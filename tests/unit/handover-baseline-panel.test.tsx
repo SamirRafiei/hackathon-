@@ -84,6 +84,44 @@ function fill() {
 }
 
 describe("baseline publication UI", () => {
+  it("prefills editable demo details but still requires a live photo before publication", () => {
+    const input = props(vi.fn());
+    render(
+      <BaselinePanel
+        {...input}
+        assetType="APARTMENT"
+        demoPreset={{
+          identifier: "Demo apartment; two keys",
+          notes: "Existing wall mark beside the sofa.",
+          checklistNotes: [
+            "Clean rooms",
+            "Sofa and table",
+            "Two keys",
+            "Wall mark",
+          ],
+        }}
+      />,
+    );
+    expect(
+      screen.getByLabelText("Property address and identifying details"),
+    ).toHaveValue("Demo apartment; two keys");
+    for (const checkbox of screen.getAllByRole("checkbox"))
+      expect(checkbox).toBeChecked();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Publish condition record" }),
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Add at least one condition photograph",
+    );
+    expect(input.onChange).not.toHaveBeenCalled();
+    expect(input.storage.finalize).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("Condition and existing damage"), {
+      target: { value: "Updated during the demo" },
+    });
+    expect(screen.getByLabelText("Condition and existing damage")).toHaveValue(
+      "Updated during the demo",
+    );
+  });
   it("blocks publication while another photograph is uploading", () => {
     const finalize = vi.fn();
     const input = props(finalize);

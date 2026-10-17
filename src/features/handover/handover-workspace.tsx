@@ -120,6 +120,21 @@ export function HandoverWorkspace(props: HandoverWorkspaceProps) {
               record={state.baseline}
               onChange={props.onBaselineChange}
               storage={storage}
+              demoPreset={
+                agreement.assetType === "APARTMENT"
+                  ? {
+                      identifier: `${agreement.address}; two keys`,
+                      notes:
+                        "Clean apartment with a furnished living area. Small existing wall mark beside the sofa; no other visible damage.",
+                      checklistNotes: [
+                        "Rooms clean; walls and floors inspected.",
+                        "Sofa, dining table and two chairs included.",
+                        "Two apartment keys supplied.",
+                        "Small existing wall mark beside the sofa.",
+                      ],
+                    }
+                  : undefined
+              }
               locked={
                 !["AWAITING_BASELINE", "AWAITING_FUNDING", "FUNDED"].includes(
                   agreement.status,

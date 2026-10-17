@@ -119,28 +119,57 @@ async function publish(
     await panel
       .getByRole("button", { name: "Create a new condition version" })
       .click();
-  await panel
-    .getByLabel(
-      /Property address and identifying details|Item model and serial/,
-    )
-    .fill(
-      asset === "camera"
-        ? "Camera DEMO-CAM-001; battery and case"
-        : "Unit DEMO-18; two keys",
+  if (asset === "apartment" && !revision) {
+    await expect(
+      panel.getByLabel("Property address and identifying details"),
+    ).toHaveValue("Fictional demo handover desk; two keys");
+    await expect(panel.getByLabel("Condition and existing damage")).toHaveValue(
+      /existing wall mark/,
     );
-  await panel
-    .getByLabel("Condition and existing damage")
-    .fill(
-      asset === "camera"
-        ? "Working camera; clean case, no scuff."
-        : "Existing wall mark beside sofa; two keys.",
+    for (const checkbox of await panel.getByRole("checkbox").all())
+      await expect(checkbox).toBeChecked();
+    await panel
+      .getByRole("button", { name: "Publish condition record" })
+      .click();
+    await expect(panel.getByRole("alert")).toHaveText(
+      /Add at least one condition photograph/,
     );
-  for (const checkbox of await panel.getByRole("checkbox").all()) {
-    if (!(await checkbox.isChecked())) {
-      await checkbox.focus();
-      await page.keyboard.press("Space");
+    expect(
+      required((await saved(page)).agreement).handover?.baseline ?? null,
+    ).toBeNull();
+  } else {
+    await panel
+      .getByLabel(
+        /Property address and identifying details|Item model and serial/,
+      )
+      .fill(
+        asset === "camera"
+          ? "Camera DEMO-CAM-001; battery and case"
+          : "Unit DEMO-18; two keys",
+      );
+    await panel
+      .getByLabel("Condition and existing damage")
+      .fill(
+        asset === "camera"
+          ? "Working camera; clean case, no scuff."
+          : "Existing wall mark beside sofa; two keys.",
+      );
+    for (const checkbox of await panel.getByRole("checkbox").all()) {
+      if (!(await checkbox.isChecked())) {
+        await checkbox.focus();
+        await page.keyboard.press("Space");
+      }
     }
   }
+  const evidenceBounds = required(
+    await page.locator("#condition-records").boundingBox(),
+  );
+  const dashboardBounds = required(
+    await page.locator(".dashboard-grid").boundingBox(),
+  );
+  expect(evidenceBounds.y + evidenceBounds.height).toBeLessThanOrEqual(
+    dashboardBounds.y,
+  );
   await panel
     .getByRole("textbox", { name: "Caption for new files" })
     .fill(`${asset} baseline — synthetic demo`);

@@ -47,6 +47,10 @@ Validation: `npm run check` passed (231 unit/component/database tests, lint, Typ
 
 replaced raw native file controls with prominent upload/camera buttons, supported-format/size guidance, optional caption help, an attached-file count, named upload progress and visible remove actions. File-count/disabled/submission guards are retained. Validation: `npm run check` passed with 236 tests; all six evidence browser checks passed using the keyboard-operated upload button and real file chooser. Two follow-up browser checks captured/reviewed the 390 px uploader and verified revised-baseline previews. No horizontal overflow was found. Physical-device camera capture remains unverified.
 
+## Live-demo input update — 17 October 2026
+
+apartment baseline drafts receive editable preset identifying details from the current agreement address plus sample condition/inventory/key notes and draft checklist selections. Presets apply only to browser-demo storage; photo uploads remain empty and mandatory, and publication/tenant acknowledgement remain explicit. Evidence is placed before the agreement/next-action/details grid on desktop and mobile. Existing submitted records are preserved. Regression coverage checks missing-photo rejection with presets, the live file chooser and the evidence-before-summary layout.
+
 ## Post-demo backend handoff
 
 - Sameer/Valera coordination: implement authenticated gateway preparation/finalization/draft-removal operations and compose them with `signedEvidenceDownload`. UI `baseline` corresponds to the existing SQL/domain `collection` evidence phase; explicitly translate that phase and return server-allocated private paths. Arrival needs an agreed schema extension. Never trust browser paths or actor IDs.

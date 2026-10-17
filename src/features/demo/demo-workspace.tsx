@@ -390,6 +390,27 @@ export default function DemoWorkspace() {
           />
         )}
 
+        <HandoverWorkspace
+          key={agreement.id}
+          agreement={agreement}
+          actor={actor}
+          onBaselineChange={(record) =>
+            commitHandover((current, currentActor) =>
+              recordBaseline(current, currentActor, record),
+            )
+          }
+          onSubmitReturn={(record) =>
+            commitHandover((current, currentActor) =>
+              submitReturn(current, currentActor, record),
+            )
+          }
+          onSubmitInspection={(record) =>
+            commitHandover((current, currentActor) =>
+              recordArrivalInspection(current, currentActor, record),
+            )
+          }
+        />
+
         <div className="dashboard-grid">
           <section
             aria-labelledby="agreement-heading"
@@ -931,27 +952,6 @@ export default function DemoWorkspace() {
             </section>
           </aside>
         </div>
-
-        <HandoverWorkspace
-          key={agreement.id}
-          agreement={agreement}
-          actor={actor}
-          onBaselineChange={(record) =>
-            commitHandover((current, currentActor) =>
-              recordBaseline(current, currentActor, record),
-            )
-          }
-          onSubmitReturn={(record) =>
-            commitHandover((current, currentActor) =>
-              submitReturn(current, currentActor, record),
-            )
-          }
-          onSubmitInspection={(record) =>
-            commitHandover((current, currentActor) =>
-              recordArrivalInspection(current, currentActor, record),
-            )
-          }
-        />
 
         <section
           aria-labelledby="activity-heading"
