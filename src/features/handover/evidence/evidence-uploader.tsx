@@ -156,8 +156,9 @@ export function EvidenceUploader({
               id={`${id}-limits`}
               className="mt-1 text-xs leading-relaxed text-muted-foreground"
             >
-              JPEG, PNG or WebP{documents ? ", or PDF documents" : ""}. Up to 10
-              MB each · {MAX_EVIDENCE_FILES} files per record.
+              JPEG, PNG or WebP
+              {documents ? ", or PDF documents" : ""}. Up to 10 MB each ·{" "}
+              {MAX_EVIDENCE_FILES} files per record.
             </p>
           </div>
         </div>
@@ -211,6 +212,7 @@ export function EvidenceUploader({
             void upload(selected);
           }}
         />
+
         <input
           ref={cameraInput}
           id={`${id}-camera`}

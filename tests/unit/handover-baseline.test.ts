@@ -100,10 +100,9 @@ describe("baseline record lifecycle", () => {
     ["invalid publication time", { now: "not a date" }],
     ["duplicate image IDs", { evidence: [{ ...evidence }, { ...evidence }] }],
     [
-      "non-photo document",
+      "PDF without a condition photo",
       {
         evidence: [
-          { ...evidence },
           { ...evidence, id: "pdf", mimeType: "application/pdf" as const },
         ],
       },
@@ -142,6 +141,17 @@ describe("baseline record lifecycle", () => {
     ["return image", { evidence: [{ ...evidence, phase: "return" as const }] }],
   ])("rejects %s", (_, changes) => {
     expect(() => publishBaseline({ ...input(), ...changes })).toThrow();
+  });
+  it("rejects PDFs even alongside condition photographs; contracts belong to agreement setup", () => {
+    expect(() =>
+      publishBaseline({
+        ...input(),
+        evidence: [
+          evidence,
+          { ...evidence, id: "pdf", mimeType: "application/pdf" },
+        ],
+      }),
+    ).toThrow("JPEG, PNG or WebP");
   });
   it("requires acknowledgment of the exact baseline and terms versions", () => {
     const source = acknowledgment();

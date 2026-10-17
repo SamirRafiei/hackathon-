@@ -59,6 +59,16 @@ describe("private evidence controls", () => {
     fireEvent.click(screen.getByRole("button", { name: "Take photo" }));
     expect(camera).toHaveBeenCalledOnce();
     expect(screen.getByText("No files attached yet")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Attach contract PDF" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Choose contract PDF"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Choose evidence files")).toHaveAttribute(
+      "accept",
+      "image/jpeg,image/png,image/webp",
+    );
   });
   it("disables both pickers when the record reaches its file limit", async () => {
     render(

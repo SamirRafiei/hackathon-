@@ -5,10 +5,10 @@ Owner: Tayma AlDabbas. Scope: T1–T3 in [plan.md](../../plan.md). Fake actors, 
 ## Prepare the presentation browser
 
 1. Open the final demo URL and download the four [sample PNGs](../../public/demo-evidence/README.md) to the computer. Use the same origin/browser for the rehearsal and presentation. Do not upload personal files.
-2. Choose **Landlord**, then **New agreement**. Creating the agreement records the owner's acceptance of version 1 and replaces the current browser agreement. Use the [confirmed setup values](setup-values.md); selecting the rental type loads the complete example.
-3. Choose **Tenant**, review the terms, check the acceptance checkbox and accept version 1.0. No deposit is reserved yet; the landlord can now publish the baseline.
-4. Switch back to **Landlord** and use **Initial condition**. The table below supplies identifying details, captions, checklist notes and files. Check all four baseline items, then **Publish condition record**. Publishing acknowledges that version as owner.
-5. Reload. Confirm the image is visible and notes remain. Switch to **Tenant**. Review the version and choose **I acknowledge condition version 1**. Funding now becomes available, with €0 reserved. Choose **Simulate funding** for the full stated deposit; only then should the rental become active.
+2. Open a fresh demo or choose **Reset demo** to start on the landlord creation form with editable apartment terms and the sample contract PDF. Review the PDF or attach a replacement (up to 10 MB), then choose **Create and accept version 1**. Creating the agreement records the owner's acceptance of version 1 and replaces the current browser agreement. Use the [confirmed setup values](setup-values.md); selecting the rental type loads the complete example.
+3. Choose **Tenant**, open the agreement contract PDF, review the terms, check the acceptance checkbox and accept version 1.0. No deposit is reserved yet; the landlord can now publish the baseline.
+4. Switch back to **Landlord** and use **Initial condition**. The table below supplies identifying details, captions, checklist notes and files. Check all four baseline items, then **Publish condition record**. The agreement contract was already attached during creation. The initial condition record accepts photos only; at least one condition photo is required. Publishing preserves all attached files and acknowledges that version as owner.
+5. Reload. Confirm the image is visible and notes remain. Switch to **Tenant**. Review the condition photos and version, then choose **I acknowledge condition version 1**. Funding now becomes available, with €0 reserved. Choose **Simulate funding** for the full stated deposit; only then should the rental become active.
 6. Open **Return declaration**, supply the return location and file, and complete the checklist as described below. Submit once. This records a statement and starts one deadline; it does not prove receipt or release funds.
 7. Reload, reopen the return and confirm the displayed deadline is unchanged and the return photo is visible. Switch to **Landlord** and open **Before & after**. Compare both images/checklists; the reserved amount must still be unchanged.
 
@@ -50,7 +50,7 @@ Comparison should flag the unchecked exception and changed notes without decidin
 
 ## Reset and recovery
 
-- **Start over:** use **Reset demo** to return to the seeded apartment or create a new agreement with the inputs above. Reset clears agreement metadata, not all previously stored IndexedDB blobs. Reattach the original sample files; old uploads are not automatically reused.
+- **Start over:** use **Reset demo** to return to landlord creation with the apartment preset and sample PDF or create a new agreement with the inputs above. Reset clears agreement metadata, not all previously stored IndexedDB blobs. Reattach the original sample files; old uploads are not automatically reused.
 - **One scenario at a time:** creating equipment replaces the current apartment record. Keep the inputs and downloaded files ready. Do not expect a scenario library or shared state between browsers.
 - **Upload failure:** check file format/size and browser storage permissions, then **Retry upload**. Stay in the same actor/view until the upload finishes. A draft upload is not a published record and may need re-uploading after leaving the form.
 - **Preview failure:** **Retry preview** first. If a draft's local file is missing/corrupt, remove the draft and upload the original sample again. Submitted records cannot be silently replaced; for this fake-data walkthrough, reset/create the agreement and rebuild it. Inability to view a file does not cancel acknowledgements or establish damage.

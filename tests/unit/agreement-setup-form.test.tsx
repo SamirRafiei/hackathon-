@@ -1,8 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import AgreementSetupForm from "@/features/agreements/components/agreement-setup-form";
 import { DEMO_AGREEMENT_PRESETS } from "@/features/demo/agreement-presets";
+
+import { BrowserContractStorage } from "@/features/agreements/contracts/storage";
+
+afterEach(() => vi.restoreAllMocks());
 
 describe("AgreementSetupForm", () => {
   it("submits version-one agreement terms as integer minor units", async () => {
@@ -165,5 +169,88 @@ describe("agreed examples and form boundaries", () => {
     fireEvent.submit(form);
     expect(onCreate).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});
+
+describe("required contract PDF", () => {
+  it("blocks creation after removing the PDF and allows restoring the demo contract", () => {
+    const { onCreate, form } = setup();
+    fireEvent.click(screen.getByRole("button", { name: "Remove contract" }));
+    fireEvent.submit(form);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Attach a contract PDF",
+    );
+    expect(onCreate).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Use demo contract PDF" }),
+    );
+    fireEvent.submit(form);
+    expect(onCreate).toHaveBeenCalledWith(DEMO_AGREEMENT_PRESETS.APARTMENT);
+  });
+
+  it("waits for an uploaded PDF to save before binding it to the agreement", async () => {
+    const contract = {
+      source: "browser-demo" as const,
+      id: "9a6bfa94-f943-4f26-8e36-2ca5422d6b58",
+      fileName: "lease.pdf",
+      sizeBytes: 31,
+      sha256: "a".repeat(64),
+    };
+    let finish!: (value: typeof contract) => void;
+    const upload = vi
+      .spyOn(BrowserContractStorage.prototype, "upload")
+      .mockReturnValue(
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+      );
+    vi.spyOn(BrowserContractStorage.prototype, "getUrl").mockResolvedValue({
+      url: "blob:contract",
+      release: vi.fn(),
+    });
+    const { onCreate, form } = setup();
+    await userEvent
+      .setup()
+      .upload(
+        screen.getByLabelText("Contract PDF"),
+        new File(["test"], "lease.pdf", { type: "application/pdf" }),
+      );
+    expect(upload).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole("button", { name: "Create and accept version 1" }),
+    ).toBeDisabled();
+    fireEvent.submit(form);
+    expect(screen.getByRole("alert")).toHaveTextContent("finish saving");
+    expect(onCreate).not.toHaveBeenCalled();
+    await act(async () => finish(contract));
+    fireEvent.submit(form);
+    expect(onCreate).toHaveBeenCalledWith({
+      ...DEMO_AGREEMENT_PRESETS.APARTMENT,
+      contract,
+    });
+    expect(
+      screen.getByRole("link", { name: /Open contract PDF: lease.pdf/ }),
+    ).toHaveAttribute("href", "blob:contract");
+  });
+
+  it("reports PDF upload failure and requires a successful attachment before creation", async () => {
+    vi.spyOn(BrowserContractStorage.prototype, "upload").mockRejectedValue(
+      new Error("The contract could not be saved."),
+    );
+    const { onCreate, form } = setup();
+    await userEvent
+      .setup()
+      .upload(
+        screen.getByLabelText("Contract PDF"),
+        new File(["test"], "lease.pdf", { type: "application/pdf" }),
+      );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "could not be saved",
+    );
+    fireEvent.submit(form);
+    expect(onCreate).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Attach a contract PDF",
+    );
   });
 });

@@ -36,7 +36,7 @@ import {
   actorForId,
   approveFullRefund,
   approveSplit,
-  createInitialDemoSnapshot,
+  createDemoSetupSnapshot,
   createDemoAgreement,
   declineSplit,
   formatMoney,
@@ -49,6 +49,7 @@ import {
 } from "@/features/demo/model";
 import { LocalDemoRepository } from "@/features/demo/repository";
 import { HandoverWorkspace } from "@/features/handover/handover-workspace";
+import { ContractLink } from "@/features/agreements/contracts/contract-link";
 import AgreementSetupForm from "@/features/agreements/components/agreement-setup-form";
 
 const dateFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -104,22 +105,26 @@ function getProgress(status: DemoSnapshot["agreement"]["status"]) {
 
 export default function DemoWorkspace() {
   const repository = useMemo(() => new LocalDemoRepository(), []);
-  const [snapshot, setSnapshot] = useState(createInitialDemoSnapshot);
+  const [snapshot, setSnapshot] = useState(createDemoSetupSnapshot);
   const [hydrated, setHydrated] = useState(false);
   const [notice, setNotice] = useState("");
   const [allocationInput, setAllocationInput] = useState("300");
   const [reasonInput, setReasonInput] = useState(
     "Cleaning and key replacement costs",
   );
-  const [showSetup, setShowSetup] = useState(false);
+  const [showSetup, setShowSetup] = useState(true);
   const [disputeReviewId, setDisputeReviewId] = useState<string | null>(null);
   const [tenantConfirmedTerms, setTenantConfirmedTerms] = useState(false);
+  const [contractReady, setContractReady] = useState(false);
 
   useEffect(() => {
     let active = true;
     void repository.load().then((saved) => {
       if (!active) return;
-      if (saved) setSnapshot(saved);
+      if (saved) {
+        setSnapshot(saved);
+        setShowSetup(Boolean(saved.setupPending));
+      }
       setHydrated(true);
     });
     return () => {
@@ -132,7 +137,10 @@ export default function DemoWorkspace() {
     const onStorage = (event: StorageEvent) => {
       if (event.key !== "pact-demo-v1") return;
       void repository.load().then((saved) => {
-        if (saved) setSnapshot(saved);
+        if (saved) {
+          setSnapshot(saved);
+          setShowSetup(Boolean(saved.setupPending));
+        }
       });
     };
     window.addEventListener("storage", onStorage);
@@ -206,6 +214,7 @@ export default function DemoWorkspace() {
   }
 
   async function switchIdentity(role: "landlord" | "tenant") {
+    if (snapshot.setupPending && role === "tenant") return;
     const selected = demoActors[role];
     // The adapter keeps the UI independent from any one identity provider.
     const resolvedActor = await new DemoIdentityProvider(
@@ -219,7 +228,7 @@ export default function DemoWorkspace() {
     setNotice("");
     setTenantConfirmedTerms(false);
     setDisputeReviewId(null);
-    setShowSetup(false);
+    setShowSetup(Boolean(snapshot.setupPending));
     void repository.save(next);
   }
 
@@ -236,14 +245,16 @@ export default function DemoWorkspace() {
 
   async function resetDemo() {
     await repository.reset();
-    const initial = createInitialDemoSnapshot();
+    const initial = createDemoSetupSnapshot();
     setSnapshot(initial);
     setAllocationInput("300");
     setReasonInput("Cleaning and key replacement costs");
-    setShowSetup(false);
+    setShowSetup(true);
     setTenantConfirmedTerms(false);
     setDisputeReviewId(null);
-    setNotice("Demo agreement reset to its starting point.");
+    setNotice(
+      "Demo reset. Create an agreement using the preset terms and contract PDF.",
+    );
   }
 
   function createAgreement(input: Parameters<typeof createDemoAgreement>[1]) {
@@ -308,6 +319,7 @@ export default function DemoWorkspace() {
               <span>Landlord</span>
             </button>
             <button
+              disabled={snapshot.setupPending}
               aria-pressed={!isLandlord}
               className={
                 !isLandlord
@@ -337,7 +349,7 @@ export default function DemoWorkspace() {
               clear for everyone.
             </p>
           </div>
-          {isLandlord && (
+          {isLandlord && !snapshot.setupPending && (
             <button
               className="reset-button"
               onClick={() => setShowSetup((visible) => !visible)}
@@ -375,691 +387,734 @@ export default function DemoWorkspace() {
           </div>
         )}
 
-        {showSetup && isLandlord && (
+        {!hydrated && <p role="status">Loading saved demo…</p>}
+        {hydrated && showSetup && isLandlord && (
           <AgreementSetupForm
             isLandlord={isLandlord}
+            allowCancel={!snapshot.setupPending}
             onCancel={() => setShowSetup(false)}
             onCreate={createAgreement}
           />
         )}
 
-        <div className="space-y-6">
-          <section
-            aria-labelledby="agreement-heading"
-            className="agreement-card"
-            id="agreement"
-          >
-            <div className="agreement-card-top">
-              <div className="agreement-kind">
-                <span className="kind-icon">
-                  <KeyRound size={16} />
-                </span>{" "}
-                {agreement.assetType === "APARTMENT"
-                  ? "APARTMENT SECURITY DEPOSIT"
-                  : "EQUIPMENT SECURITY DEPOSIT"}
-              </div>
-              <span
-                className={`status-pill status-${agreement.status.toLowerCase().replaceAll("_", "-")}`}
+        {hydrated && !showSetup && !snapshot.setupPending && (
+          <>
+            <div className="space-y-6">
+              <section
+                aria-labelledby="agreement-heading"
+                className="agreement-card"
+                id="agreement"
               >
-                <span /> {statusLabel(agreement.status)}
-              </span>
-            </div>
-
-            <div className="agreement-heading-row">
-              <div>
-                <p className="section-kicker">YOUR AGREEMENT</p>
-                <h2 id="agreement-heading">{agreement.title}</h2>
-                <p className="address-line">{agreement.address}</p>
-              </div>
-              <span className="terms-readonly">
-                VERSION {agreement.termsVersion}.0
-              </span>
-            </div>
-
-            <div className="amount-block">
-              <div>
-                <p className="amount-label">
-                  {agreement.status === "COMPLETED"
-                    ? "SETTLED AMOUNT"
-                    : "AGREED DEPOSIT"}
-                </p>
-                <p className="amount-value">
-                  {formatMoney(agreement.amountMinor)}
-                </p>
-              </div>
-              <div className="amount-side">
-                <span className="amount-side-icon">
-                  <LockKeyhole size={16} />
-                </span>
-                <div>
-                  <span className="amount-side-title">
-                    {agreement.status === "COMPLETED"
-                      ? "Settlement complete"
-                      : `${formatMoney(remaining)} reserved`}
+                <div className="agreement-card-top">
+                  <div className="agreement-kind">
+                    <span className="kind-icon">
+                      <KeyRound size={16} />
+                    </span>{" "}
+                    {agreement.assetType === "APARTMENT"
+                      ? "APARTMENT SECURITY DEPOSIT"
+                      : "EQUIPMENT SECURITY DEPOSIT"}
+                  </div>
+                  <span
+                    className={`status-pill status-${agreement.status.toLowerCase().replaceAll("_", "-")}`}
+                  >
+                    <span /> {statusLabel(agreement.status)}
                   </span>
-                  <span className="amount-side-caption">Demo ledger · EUR</span>
                 </div>
-              </div>
-            </div>
 
-            <div className="parties-row">
-              <PartyCard
-                accepted={landlordAcceptance}
-                active={isLandlord}
-                initials="MP"
-                label="LANDLORD"
-                name={demoActors.landlord.displayName}
-                onClick={() => void switchIdentity("landlord")}
-                partyRole="landlord"
-              />
-              <div className="party-connector">
-                <span />
-              </div>
-              <PartyCard
-                accepted={tenantAcceptance}
-                active={!isLandlord}
-                initials="LM"
-                label="TENANT"
-                name={demoActors.tenant.displayName}
-                onClick={() => void switchIdentity("tenant")}
-                partyRole="tenant"
-              />
-            </div>
+                <div className="agreement-heading-row">
+                  <div>
+                    <p className="section-kicker">YOUR AGREEMENT</p>
+                    <h2 id="agreement-heading">{agreement.title}</h2>
+                    <p className="address-line">{agreement.address}</p>
+                  </div>
+                  <span className="terms-readonly">
+                    VERSION {agreement.termsVersion}.0
+                  </span>
+                </div>
 
-            <div className="terms-row">
-              <div className="terms-icon">
-                <FileText size={17} />
-              </div>
-              <div className="terms-copy">
-                <strong>
-                  Agreed terms · Version {agreement.termsVersion}.0
-                </strong>
-                <span>
-                  {formatDate(agreement.startDate)} —{" "}
-                  {formatDate(agreement.endDate)}
-                </span>
-              </div>
-              <span className="terms-readonly">FIXED AFTER FUNDING</span>
-            </div>
-            <p className="terms-text">{agreement.terms}</p>
-
-            <div className="progress-section">
-              <div className="progress-heading">
-                <span>Agreement progress</span>
-                <span className="progress-count">
-                  {progress} <span>/ 4</span>
-                </span>
-              </div>
-              <div
-                aria-label={`Step ${progress} of 4`}
-                className="progress-track"
-                role="img"
-              >
-                <span style={{ width: `${progress * 25}%` }} />
-              </div>
-              <div className="progress-labels">
-                <span>Agree</span>
-                <span>Condition</span>
-                <span>Fund & return</span>
-                <span>Settle</span>
-              </div>
-            </div>
-
-            <div className="action-area">
-              {agreement.status === "AWAITING_ACCEPTANCE" &&
-                (agreement.acceptedBy[actor.role] ? (
-                  <WaitingCard
-                    icon={<Clock3 size={17} />}
-                    title="Your terms are accepted"
-                    text={`Waiting for ${actor.role === "landlord" ? "the tenant" : "the landlord"} to accept the same version.`}
-                  />
-                ) : (
-                  <>
-                    <label className="acceptance-check">
-                      <input
-                        checked={tenantConfirmedTerms}
-                        onChange={(event) =>
-                          setTenantConfirmedTerms(event.target.checked)
-                        }
-                        type="checkbox"
-                      />
-                      <span>
-                        I reviewed and accept version {agreement.termsVersion}.0
-                        of these terms.
-                      </span>
-                    </label>
-                    <ActionPanel
-                      description="Your acceptance applies to this version only. Any later revision would need fresh approval."
-                      onClick={() =>
-                        commit((current, currentActor) =>
-                          acceptTerms(current, currentActor),
-                        )
-                      }
-                      title="Accept the agreement"
-                      buttonLabel={`Accept version ${agreement.termsVersion}.0`}
-                      disabled={!tenantConfirmedTerms}
-                    />
-                  </>
-                ))}
-              {awaitingBaseline && (
-                <WaitingCard
-                  icon={<KeyRound size={17} />}
-                  title={
-                    isLandlord
-                      ? "Publish the condition baseline"
-                      : "Waiting for the landlord’s condition baseline"
-                  }
-                  text="The terms are accepted. The landlord records the initial condition below, then the tenant reviews it before funding. No deposit is reserved yet."
-                />
-              )}
-              {agreement.status === "AWAITING_FUNDING" &&
-                !awaitingBaseline &&
-                (!baselineReady ? (
-                  <WaitingCard
-                    icon={<KeyRound size={17} />}
-                    title={
-                      isLandlord
-                        ? "Waiting for tenant condition review"
-                        : "Review the condition baseline"
-                    }
-                    text="Review the photographs and checklist below. The tenant must acknowledge this condition version before the deposit can be funded."
-                  />
-                ) : actor.role === "tenant" ? (
-                  <ActionPanel
-                    description="The terms and condition baseline are approved. Simulate reserving the full deposit to activate the rental."
-                    onClick={() =>
-                      commit((current, currentActor) =>
-                        fundAgreement(current, currentActor),
-                      )
-                    }
-                    title="The agreement is ready"
-                    buttonLabel={`Simulate funding ${formatMoney(agreement.amountMinor)}`}
-                    icon={<HandCoins size={17} />}
-                  />
-                ) : (
-                  <WaitingCard
-                    icon={<Clock3 size={17} />}
-                    title="Waiting for the tenant to fund"
-                    text="The agreed amount will appear as reserved demo funds. It is not spendable by either party."
-                  />
-                ))}
-              {(agreement.status === "FUNDED" ||
-                agreement.status === "ACTIVE") && (
-                <WaitingCard
-                  icon={<KeyRound size={17} />}
-                  title={
-                    agreement.status === "ACTIVE"
-                      ? "Rental active"
-                      : "Funded — awaiting condition baseline"
-                  }
-                  text={
-                    agreement.status === "ACTIVE"
-                      ? "Use the condition record below to document the return. The first declaration starts one 48-hour review window."
-                      : "The owner records the initial condition below. Both parties must acknowledge the same baseline before the rental activates."
-                  }
-                />
-              )}
-              {agreement.status === "RETURN_REVIEW" &&
-                (actor.role === "landlord" ? (
-                  disputeReviewId === returnReviewId ? (
-                    <div className="proposal-panel">
-                      <div className="panel-heading">
-                        <span className="panel-icon">
-                          <HandCoins size={17} />
-                        </span>
-                        <div>
-                          <strong>
-                            {revisionRequested
-                              ? `Revise proposal v${proposal.version}`
-                              : "Suggest a fair split"}
-                          </strong>
-                          <span>
-                            {revisionRequested
-                              ? `The tenant asked to revise. You act next: propose a new version or approve a full refund. ${formatMoney(remaining)} stays reserved.`
-                              : "The tenant must approve this exact proposal."}
-                          </span>
-                        </div>
-                      </div>
-                      <form className="proposal-form" onSubmit={sendProposal}>
-                        <p className="refund-preview">
-                          Demo — simulated funds. A new version requires fresh
-                          tenant approval.
-                        </p>
-                        <label htmlFor="allocation">Landlord allocation</label>
-                        <div className="input-with-prefix">
-                          <span>€</span>
-                          <input
-                            id="allocation"
-                            inputMode="decimal"
-                            max={agreement.reservedMinor / 100}
-                            min="0"
-                            onChange={(event) =>
-                              setAllocationInput(event.target.value)
-                            }
-                            required
-                            step="0.01"
-                            type="number"
-                            value={allocationInput}
-                          />
-                        </div>
-                        <label htmlFor="proposal-reason">Reason</label>
-                        <input
-                          id="proposal-reason"
-                          maxLength={160}
-                          onChange={(event) =>
-                            setReasonInput(event.target.value)
-                          }
-                          placeholder="Briefly explain the proposed allocation"
-                          required
-                          value={reasonInput}
-                        />
-                        <p className="refund-preview">
-                          <span>Tenant refund</span>
-                          <strong>
-                            {formatMoney(
-                              Math.max(
-                                0,
-                                agreement.reservedMinor -
-                                  Math.round(
-                                    (Number(allocationInput) || 0) * 100,
-                                  ),
-                              ),
-                            )}
-                          </strong>
-                        </p>
-                        <button className="primary-action" type="submit">
-                          Send split proposal <ArrowUpRight size={16} />
-                        </button>
-                      </form>
-                      <button
-                        className="text-action"
-                        onClick={() => setDisputeReviewId(null)}
-                        type="button"
-                      >
-                        Back to return review
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="proposal-panel">
-                      <div className="panel-heading">
-                        <span className="panel-icon">
-                          <ShieldCheck size={17} />
-                        </span>
-                        <div>
-                          <strong>
-                            {revisionRequested
-                              ? `Revision requested for v${proposal.version}`
-                              : "Review the return"}
-                          </strong>
-                          <span>
-                            {revisionRequested
-                              ? "The tenant requested a revision. Release the full deposit or start a dispute to revise the proposal."
-                              : `Release ${formatMoney(remaining)} to the tenant if everything is in order, or start a dispute to propose a deduction.`}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="proposal-form">
-                        <button
-                          className="primary-action"
-                          onClick={() =>
-                            commit((current, currentActor) =>
-                              approveFullRefund(current, currentActor),
-                            )
-                          }
-                          type="button"
-                        >
-                          <Check size={16} /> Release full deposit
-                        </button>
-                        <button
-                          className="secondary-action"
-                          onClick={() => setDisputeReviewId(returnReviewId)}
-                          type="button"
-                        >
-                          Start dispute
-                        </button>
-                      </div>
-                    </div>
-                  )
-                ) : (
-                  <WaitingCard
-                    icon={<Clock3 size={17} />}
-                    title={
-                      revisionRequested
-                        ? `Revision requested for v${proposal.version}`
-                        : "Return review is open"
-                    }
-                    text={`The landlord acts next: ${revisionRequested ? "publish a revised proposal" : "suggest a split"} or approve a full refund. ${formatMoney(remaining)} stays reserved. Silence does not settle funds; no independent reviewer is involved.`}
-                  />
-                ))}
-              {agreement.status === "PROPOSAL_PENDING" &&
-                proposal &&
-                (actor.role === "tenant" ? (
-                  <div className="proposal-panel proposal-review">
-                    <div className="panel-heading">
-                      <span className="panel-icon">
-                        <FileText size={17} />
-                      </span>
-                      <div>
-                        <strong>
-                          Review split proposal · v{proposal.version}
-                        </strong>
-                        <span>
-                          Demo — simulated funds. Approving this version
-                          completes the demo settlement.
-                        </span>
-                      </div>
-                    </div>
-                    <div className="split-summary">
-                      <div>
-                        <span>Your refund</span>
-                        <strong>
-                          {formatMoney(proposal.renterRefundMinor)}
-                        </strong>
-                      </div>
-                      <div>
-                        <span>Landlord allocation</span>
-                        <strong>
-                          {formatMoney(proposal.ownerAllocationMinor)}
-                        </strong>
-                      </div>
-                    </div>
-                    <blockquote>{proposal.reason}</blockquote>
-                    <p className="refund-preview">
-                      {formatMoney(remaining)} stays reserved until you approve.
-                      Asking to revise or not responding does not settle funds.
-                      No independent reviewer is involved.
+                <div className="amount-block">
+                  <div>
+                    <p className="amount-label">
+                      {agreement.status === "COMPLETED"
+                        ? "SETTLED AMOUNT"
+                        : "AGREED DEPOSIT"}
                     </p>
-                    <div className="proposal-actions">
-                      <button
-                        className="secondary-action"
-                        onClick={() =>
-                          commit((current, currentActor) =>
-                            declineSplit(current, currentActor),
-                          )
-                        }
-                        type="button"
-                      >
-                        Ask to revise
-                      </button>
-                      <button
-                        className="primary-action"
-                        onClick={() =>
-                          commit((current, currentActor) =>
-                            approveSplit(current, currentActor),
-                          )
-                        }
-                        type="button"
-                      >
-                        <Check size={16} /> Approve this split
-                      </button>
+                    <p className="amount-value">
+                      {formatMoney(agreement.amountMinor)}
+                    </p>
+                  </div>
+                  <div className="amount-side">
+                    <span className="amount-side-icon">
+                      <LockKeyhole size={16} />
+                    </span>
+                    <div>
+                      <span className="amount-side-title">
+                        {agreement.status === "COMPLETED"
+                          ? "Settlement complete"
+                          : `${formatMoney(remaining)} reserved`}
+                      </span>
+                      <span className="amount-side-caption">
+                        Demo ledger · EUR
+                      </span>
                     </div>
                   </div>
-                ) : (
-                  <WaitingCard
-                    icon={<Clock3 size={17} />}
-                    title="Split proposal sent"
-                    text={`The tenant acts next: review version ${proposal.version} — ${formatMoney(proposal.renterRefundMinor)} refund and ${formatMoney(proposal.ownerAllocationMinor)} landlord allocation. ${formatMoney(remaining)} stays reserved while approval is pending. Silence does not settle funds. Demo — simulated funds; no independent reviewer is involved.`}
+                </div>
+
+                <div className="parties-row">
+                  <PartyCard
+                    accepted={landlordAcceptance}
+                    active={isLandlord}
+                    initials="MP"
+                    label="LANDLORD"
+                    name={demoActors.landlord.displayName}
+                    onClick={() => void switchIdentity("landlord")}
+                    partyRole="landlord"
                   />
-                ))}
-              {agreement.status === "COMPLETED" && (
-                <div className="settled-panel">
-                  <span className="settled-icon">
-                    <Check size={18} />
-                  </span>
-                  <div>
-                    <strong>Demo settlement complete</strong>
+                  <div className="party-connector">
+                    <span />
+                  </div>
+                  <PartyCard
+                    accepted={tenantAcceptance}
+                    active={!isLandlord}
+                    initials="LM"
+                    label="TENANT"
+                    name={demoActors.tenant.displayName}
+                    onClick={() => void switchIdentity("tenant")}
+                    partyRole="tenant"
+                  />
+                </div>
+
+                <div className="terms-row">
+                  <div className="terms-icon">
+                    <FileText size={17} />
+                  </div>
+                  <div className="terms-copy">
+                    <strong>
+                      Agreed terms · Version {agreement.termsVersion}.0
+                    </strong>
                     <span>
-                      {`${formatMoney(settledRefund)} to the tenant · ${formatMoney(settledAllocation)} to the landlord · ${formatMoney(remaining)} reserved. Demo — simulated funds; no real payment was made.`}
+                      {formatDate(agreement.startDate)} —{" "}
+                      {formatDate(agreement.endDate)}
                     </span>
                   </div>
+                  <span className="terms-readonly">FIXED AFTER FUNDING</span>
                 </div>
-              )}
-              {!hydrated && (
-                <div aria-live="polite" className="hydration-cover">
-                  Loading saved demo…
-                </div>
-              )}
-            </div>
-          </section>
+                <p className="terms-text">{agreement.terms}</p>
+                {agreement.contract ? (
+                  <ContractLink
+                    contract={agreement.contract}
+                    onReady={setContractReady}
+                  />
+                ) : (
+                  <p className="setup-warning">
+                    This older demo agreement has no attached contract. Reset to
+                    create one with a PDF.
+                  </p>
+                )}
 
-          <HandoverWorkspace
-            key={agreement.id}
-            agreement={agreement}
-            actor={actor}
-            onBaselineChange={(record) =>
-              commitHandover((current, currentActor) =>
-                recordBaseline(current, currentActor, record),
-              )
-            }
-            onSubmitReturn={(record) =>
-              commitHandover((current, currentActor) =>
-                submitReturn(current, currentActor, record),
-              )
-            }
-            onSubmitInspection={(record) =>
-              commitHandover((current, currentActor) =>
-                recordArrivalInspection(current, currentActor, record),
-              )
-            }
-          />
-
-          <aside className="grid gap-6 md:grid-cols-2">
-            <section aria-labelledby="next-step-heading" className="next-card">
-              <div className="side-card-header">
-                <span className="side-card-icon">
-                  <CircleDollarSign size={18} />
-                </span>
-                <span className="section-kicker">DEMO OVERVIEW</span>
-              </div>
-              <h2 id="next-step-heading">
-                {agreement.status === "COMPLETED"
-                  ? "All settled"
-                  : "A clear path forward"}
-              </h2>
-              <p className="next-copy">
-                {agreement.status === "PROPOSAL_PENDING"
-                  ? "The agreement stays in review until both people approve the same split."
-                  : agreement.status === "COMPLETED"
-                    ? "The final outcome is recorded in the local demo ledger and activity history. No real payment was made."
-                    : "Each step is visible to both parties. A landlord allocation needs tenant approval; a full refund returns to the tenant."}
-              </p>
-              <div className="next-step-box">
-                <div className="next-step-top">
-                  <span>NEXT STEP</span>
-                  <span className="step-dot" />
+                <div className="progress-section">
+                  <div className="progress-heading">
+                    <span>Agreement progress</span>
+                    <span className="progress-count">
+                      {progress} <span>/ 4</span>
+                    </span>
+                  </div>
+                  <div
+                    aria-label={`Step ${progress} of 4`}
+                    className="progress-track"
+                    role="img"
+                  >
+                    <span style={{ width: `${progress * 25}%` }} />
+                  </div>
+                  <div className="progress-labels">
+                    <span>Agree</span>
+                    <span>Condition</span>
+                    <span>Fund & return</span>
+                    <span>Settle</span>
+                  </div>
                 </div>
-                <strong>
-                  {nextActionText(
-                    agreement.status,
-                    actor.role,
-                    !!baseline,
-                    baselineReady,
+
+                <div className="action-area">
+                  {agreement.status === "AWAITING_ACCEPTANCE" &&
+                    (agreement.acceptedBy[actor.role] ? (
+                      <WaitingCard
+                        icon={<Clock3 size={17} />}
+                        title="Your terms are accepted"
+                        text={`Waiting for ${actor.role === "landlord" ? "the tenant" : "the landlord"} to accept the same version.`}
+                      />
+                    ) : (
+                      <>
+                        <label className="acceptance-check">
+                          <input
+                            checked={tenantConfirmedTerms}
+                            onChange={(event) =>
+                              setTenantConfirmedTerms(event.target.checked)
+                            }
+                            type="checkbox"
+                          />
+                          <span>
+                            I reviewed and accept version{" "}
+                            {agreement.termsVersion}.0 of these terms and the
+                            attached contract PDF.
+                          </span>
+                        </label>
+                        <ActionPanel
+                          description="Your acceptance applies to this version only. Any later revision would need fresh approval."
+                          onClick={() =>
+                            commit((current, currentActor) =>
+                              acceptTerms(current, currentActor),
+                            )
+                          }
+                          title="Accept the agreement"
+                          buttonLabel={`Accept version ${agreement.termsVersion}.0`}
+                          disabled={
+                            !tenantConfirmedTerms ||
+                            (!!agreement.contract && !contractReady)
+                          }
+                        />
+                      </>
+                    ))}
+                  {awaitingBaseline && (
+                    <WaitingCard
+                      icon={<KeyRound size={17} />}
+                      title={
+                        isLandlord
+                          ? "Publish the condition baseline"
+                          : "Waiting for the landlord’s condition baseline"
+                      }
+                      text="The terms are accepted. The landlord records the initial condition below, then the tenant reviews it before funding. No deposit is reserved yet."
+                    />
                   )}
-                </strong>
-                <span className="next-step-person">
-                  {nextActorText(agreement.status, actor.role, !!baseline)}
-                </span>
-              </div>
-              <div className="security-points">
-                <div>
-                  <span>
-                    <LockKeyhole size={14} />
-                  </span>
-                  <p>
-                    <strong>Terms stay fixed</strong>
-                    <small>Accepted version is kept with the agreement.</small>
-                  </p>
+                  {agreement.status === "AWAITING_FUNDING" &&
+                    !awaitingBaseline &&
+                    (!baselineReady ? (
+                      <WaitingCard
+                        icon={<KeyRound size={17} />}
+                        title={
+                          isLandlord
+                            ? "Waiting for tenant condition review"
+                            : "Review the condition baseline"
+                        }
+                        text="Review the photographs and checklist below. The tenant must acknowledge this condition version before the deposit can be funded."
+                      />
+                    ) : actor.role === "tenant" ? (
+                      <ActionPanel
+                        description="The terms and condition baseline are approved. Simulate reserving the full deposit to activate the rental."
+                        onClick={() =>
+                          commit((current, currentActor) =>
+                            fundAgreement(current, currentActor),
+                          )
+                        }
+                        title="The agreement is ready"
+                        buttonLabel={`Simulate funding ${formatMoney(agreement.amountMinor)}`}
+                        icon={<HandCoins size={17} />}
+                      />
+                    ) : (
+                      <WaitingCard
+                        icon={<Clock3 size={17} />}
+                        title="Waiting for the tenant to fund"
+                        text="The agreed amount will appear as reserved demo funds. It is not spendable by either party."
+                      />
+                    ))}
+                  {(agreement.status === "FUNDED" ||
+                    agreement.status === "ACTIVE") && (
+                    <WaitingCard
+                      icon={<KeyRound size={17} />}
+                      title={
+                        agreement.status === "ACTIVE"
+                          ? "Rental active"
+                          : "Funded — awaiting condition baseline"
+                      }
+                      text={
+                        agreement.status === "ACTIVE"
+                          ? "Use the condition record below to document the return. The first declaration starts one 48-hour review window."
+                          : "The owner records the initial condition below. Both parties must acknowledge the same baseline before the rental activates."
+                      }
+                    />
+                  )}
+                  {agreement.status === "RETURN_REVIEW" &&
+                    (actor.role === "landlord" ? (
+                      disputeReviewId === returnReviewId ? (
+                        <div className="proposal-panel">
+                          <div className="panel-heading">
+                            <span className="panel-icon">
+                              <HandCoins size={17} />
+                            </span>
+                            <div>
+                              <strong>
+                                {revisionRequested
+                                  ? `Revise proposal v${proposal.version}`
+                                  : "Suggest a fair split"}
+                              </strong>
+                              <span>
+                                {revisionRequested
+                                  ? `The tenant asked to revise. You act next: propose a new version or approve a full refund. ${formatMoney(remaining)} stays reserved.`
+                                  : "The tenant must approve this exact proposal."}
+                              </span>
+                            </div>
+                          </div>
+                          <form
+                            className="proposal-form"
+                            onSubmit={sendProposal}
+                          >
+                            <p className="refund-preview">
+                              Demo — simulated funds. A new version requires
+                              fresh tenant approval.
+                            </p>
+                            <label htmlFor="allocation">
+                              Landlord allocation
+                            </label>
+                            <div className="input-with-prefix">
+                              <span>€</span>
+                              <input
+                                id="allocation"
+                                inputMode="decimal"
+                                max={agreement.reservedMinor / 100}
+                                min="0"
+                                onChange={(event) =>
+                                  setAllocationInput(event.target.value)
+                                }
+                                required
+                                step="0.01"
+                                type="number"
+                                value={allocationInput}
+                              />
+                            </div>
+                            <label htmlFor="proposal-reason">Reason</label>
+                            <input
+                              id="proposal-reason"
+                              maxLength={160}
+                              onChange={(event) =>
+                                setReasonInput(event.target.value)
+                              }
+                              placeholder="Briefly explain the proposed allocation"
+                              required
+                              value={reasonInput}
+                            />
+                            <p className="refund-preview">
+                              <span>Tenant refund</span>
+                              <strong>
+                                {formatMoney(
+                                  Math.max(
+                                    0,
+                                    agreement.reservedMinor -
+                                      Math.round(
+                                        (Number(allocationInput) || 0) * 100,
+                                      ),
+                                  ),
+                                )}
+                              </strong>
+                            </p>
+                            <button className="primary-action" type="submit">
+                              Send split proposal <ArrowUpRight size={16} />
+                            </button>
+                          </form>
+                          <button
+                            className="text-action"
+                            onClick={() => setDisputeReviewId(null)}
+                            type="button"
+                          >
+                            Back to return review
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="proposal-panel">
+                          <div className="panel-heading">
+                            <span className="panel-icon">
+                              <ShieldCheck size={17} />
+                            </span>
+                            <div>
+                              <strong>
+                                {revisionRequested
+                                  ? `Revision requested for v${proposal.version}`
+                                  : "Review the return"}
+                              </strong>
+                              <span>
+                                {revisionRequested
+                                  ? "The tenant requested a revision. Release the full deposit or start a dispute to revise the proposal."
+                                  : `Release ${formatMoney(remaining)} to the tenant if everything is in order, or start a dispute to propose a deduction.`}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="proposal-form">
+                            <button
+                              className="primary-action"
+                              onClick={() =>
+                                commit((current, currentActor) =>
+                                  approveFullRefund(current, currentActor),
+                                )
+                              }
+                              type="button"
+                            >
+                              <Check size={16} /> Release full deposit
+                            </button>
+                            <button
+                              className="secondary-action"
+                              onClick={() => setDisputeReviewId(returnReviewId)}
+                              type="button"
+                            >
+                              Start dispute
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    ) : (
+                      <WaitingCard
+                        icon={<Clock3 size={17} />}
+                        title={
+                          revisionRequested
+                            ? `Revision requested for v${proposal.version}`
+                            : "Return review is open"
+                        }
+                        text={`The landlord acts next: ${revisionRequested ? "publish a revised proposal" : "suggest a split"} or approve a full refund. ${formatMoney(remaining)} stays reserved. Silence does not settle funds; no independent reviewer is involved.`}
+                      />
+                    ))}
+                  {agreement.status === "PROPOSAL_PENDING" &&
+                    proposal &&
+                    (actor.role === "tenant" ? (
+                      <div className="proposal-panel proposal-review">
+                        <div className="panel-heading">
+                          <span className="panel-icon">
+                            <FileText size={17} />
+                          </span>
+                          <div>
+                            <strong>
+                              Review split proposal · v{proposal.version}
+                            </strong>
+                            <span>
+                              Demo — simulated funds. Approving this version
+                              completes the demo settlement.
+                            </span>
+                          </div>
+                        </div>
+                        <div className="split-summary">
+                          <div>
+                            <span>Your refund</span>
+                            <strong>
+                              {formatMoney(proposal.renterRefundMinor)}
+                            </strong>
+                          </div>
+                          <div>
+                            <span>Landlord allocation</span>
+                            <strong>
+                              {formatMoney(proposal.ownerAllocationMinor)}
+                            </strong>
+                          </div>
+                        </div>
+                        <blockquote>{proposal.reason}</blockquote>
+                        <p className="refund-preview">
+                          {formatMoney(remaining)} stays reserved until you
+                          approve. Asking to revise or not responding does not
+                          settle funds. No independent reviewer is involved.
+                        </p>
+                        <div className="proposal-actions">
+                          <button
+                            className="secondary-action"
+                            onClick={() =>
+                              commit((current, currentActor) =>
+                                declineSplit(current, currentActor),
+                              )
+                            }
+                            type="button"
+                          >
+                            Ask to revise
+                          </button>
+                          <button
+                            className="primary-action"
+                            onClick={() =>
+                              commit((current, currentActor) =>
+                                approveSplit(current, currentActor),
+                              )
+                            }
+                            type="button"
+                          >
+                            <Check size={16} /> Approve this split
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <WaitingCard
+                        icon={<Clock3 size={17} />}
+                        title="Split proposal sent"
+                        text={`The tenant acts next: review version ${proposal.version} — ${formatMoney(proposal.renterRefundMinor)} refund and ${formatMoney(proposal.ownerAllocationMinor)} landlord allocation. ${formatMoney(remaining)} stays reserved while approval is pending. Silence does not settle funds. Demo — simulated funds; no independent reviewer is involved.`}
+                      />
+                    ))}
+                  {agreement.status === "COMPLETED" && (
+                    <div className="settled-panel">
+                      <span className="settled-icon">
+                        <Check size={18} />
+                      </span>
+                      <div>
+                        <strong>Demo settlement complete</strong>
+                        <span>
+                          {`${formatMoney(settledRefund)} to the tenant · ${formatMoney(settledAllocation)} to the landlord · ${formatMoney(remaining)} reserved. Demo — simulated funds; no real payment was made.`}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  {!hydrated && (
+                    <div aria-live="polite" className="hydration-cover">
+                      Loading saved demo…
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <span>
-                    <HandCoins size={14} />
-                  </span>
-                  <p>
-                    <strong>Splits need agreement</strong>
-                    <small>No silent deductions or one-sided settlement.</small>
-                  </p>
-                </div>
-                <div>
-                  <span>
-                    <ShieldCheck size={14} />
-                  </span>
-                  <p>
-                    <strong>Every step is recorded</strong>
-                    <small>Review the shared activity below.</small>
-                  </p>
-                </div>
-              </div>
-            </section>
+              </section>
 
-            <section aria-labelledby="details-heading" className="details-card">
-              <div className="details-heading-row">
-                <div>
-                  <p className="section-kicker">AT A GLANCE</p>
-                  <h2 id="details-heading">Agreement details</h2>
-                </div>
-                <span className="details-icon">
-                  <FileText size={17} />
-                </span>
-              </div>
-              <DetailLine
-                label="Asset type"
-                value={
-                  agreement.assetType === "APARTMENT"
-                    ? "Apartment"
-                    : "Equipment"
+              <HandoverWorkspace
+                key={agreement.id}
+                agreement={agreement}
+                actor={actor}
+                onBaselineChange={(record) =>
+                  commitHandover((current, currentActor) =>
+                    recordBaseline(current, currentActor, record),
+                  )
+                }
+                onSubmitReturn={(record) =>
+                  commitHandover((current, currentActor) =>
+                    submitReturn(current, currentActor, record),
+                  )
+                }
+                onSubmitInspection={(record) =>
+                  commitHandover((current, currentActor) =>
+                    recordArrivalInspection(current, currentActor, record),
+                  )
                 }
               />
-              <DetailLine
-                label="Deposit"
-                value={formatMoney(agreement.amountMinor)}
-              />
-              <DetailLine label="Review window" value="48 hours" />
-              <DetailLine
-                label="Terms accepted"
-                value={`${Number(landlordAcceptance) + Number(tenantAcceptance)} of 2`}
-              />
-              <div className="details-footer">
-                <span>DEMO AGREEMENT</span>
-                <span>ID · {agreement.id.slice(-8).toUpperCase()}</span>
+
+              <aside className="grid gap-6 md:grid-cols-2">
+                <section
+                  aria-labelledby="next-step-heading"
+                  className="next-card"
+                >
+                  <div className="side-card-header">
+                    <span className="side-card-icon">
+                      <CircleDollarSign size={18} />
+                    </span>
+                    <span className="section-kicker">DEMO OVERVIEW</span>
+                  </div>
+                  <h2 id="next-step-heading">
+                    {agreement.status === "COMPLETED"
+                      ? "All settled"
+                      : "A clear path forward"}
+                  </h2>
+                  <p className="next-copy">
+                    {agreement.status === "PROPOSAL_PENDING"
+                      ? "The agreement stays in review until both people approve the same split."
+                      : agreement.status === "COMPLETED"
+                        ? "The final outcome is recorded in the local demo ledger and activity history. No real payment was made."
+                        : "Each step is visible to both parties. A landlord allocation needs tenant approval; a full refund returns to the tenant."}
+                  </p>
+                  <div className="next-step-box">
+                    <div className="next-step-top">
+                      <span>NEXT STEP</span>
+                      <span className="step-dot" />
+                    </div>
+                    <strong>
+                      {nextActionText(
+                        agreement.status,
+                        actor.role,
+                        !!baseline,
+                        baselineReady,
+                      )}
+                    </strong>
+                    <span className="next-step-person">
+                      {nextActorText(agreement.status, actor.role, !!baseline)}
+                    </span>
+                  </div>
+                  <div className="security-points">
+                    <div>
+                      <span>
+                        <LockKeyhole size={14} />
+                      </span>
+                      <p>
+                        <strong>Terms stay fixed</strong>
+                        <small>
+                          Accepted version is kept with the agreement.
+                        </small>
+                      </p>
+                    </div>
+                    <div>
+                      <span>
+                        <HandCoins size={14} />
+                      </span>
+                      <p>
+                        <strong>Splits need agreement</strong>
+                        <small>
+                          No silent deductions or one-sided settlement.
+                        </small>
+                      </p>
+                    </div>
+                    <div>
+                      <span>
+                        <ShieldCheck size={14} />
+                      </span>
+                      <p>
+                        <strong>Every step is recorded</strong>
+                        <small>Review the shared activity below.</small>
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
+                <section
+                  aria-labelledby="details-heading"
+                  className="details-card"
+                >
+                  <div className="details-heading-row">
+                    <div>
+                      <p className="section-kicker">AT A GLANCE</p>
+                      <h2 id="details-heading">Agreement details</h2>
+                    </div>
+                    <span className="details-icon">
+                      <FileText size={17} />
+                    </span>
+                  </div>
+                  <DetailLine
+                    label="Asset type"
+                    value={
+                      agreement.assetType === "APARTMENT"
+                        ? "Apartment"
+                        : "Equipment"
+                    }
+                  />
+                  <DetailLine
+                    label="Deposit"
+                    value={formatMoney(agreement.amountMinor)}
+                  />
+                  <DetailLine label="Review window" value="48 hours" />
+                  <DetailLine
+                    label="Terms accepted"
+                    value={`${Number(landlordAcceptance) + Number(tenantAcceptance)} of 2`}
+                  />
+                  <div className="details-footer">
+                    <span>DEMO AGREEMENT</span>
+                    <span>ID · {agreement.id.slice(-8).toUpperCase()}</span>
+                  </div>
+                </section>
+              </aside>
+            </div>
+
+            <section
+              aria-labelledby="activity-heading"
+              className="activity-card"
+              id="activity"
+            >
+              <div className="activity-header">
+                <div>
+                  <p className="section-kicker">LOCAL DEMO RECORD</p>
+                  <h2 id="activity-heading">Agreement activity</h2>
+                </div>
+                <span className="activity-count">
+                  {agreement.activity.length} updates
+                </span>
+              </div>
+              <div className="activity-list">
+                {agreement.activity.map((item, index) => (
+                  <div className="activity-item" key={item.id}>
+                    <span
+                      className={`activity-marker ${index === 0 ? "activity-marker-current" : ""}`}
+                    >
+                      {index === 0 ? <Check size={14} /> : <span />}
+                    </span>
+                    <div className="activity-body">
+                      <strong>{item.description}</strong>
+                      <span>{item.actorName}</span>
+                    </div>
+                    <time dateTime={item.createdAt}>
+                      {dateTimeFormatter.format(new Date(item.createdAt))}
+                    </time>
+                  </div>
+                ))}
+              </div>
+              <div className="activity-footer">
+                <span>
+                  <LockKeyhole size={13} /> Visible to both demo identities in
+                  this browser
+                </span>
+                <button
+                  onClick={() =>
+                    document
+                      .getElementById("ledger")
+                      ?.scrollIntoView({ behavior: "smooth" })
+                  }
+                  type="button"
+                >
+                  View ledger <ChevronRight size={14} />
+                </button>
               </div>
             </section>
-          </aside>
-        </div>
 
-        <section
-          aria-labelledby="activity-heading"
-          className="activity-card"
-          id="activity"
-        >
-          <div className="activity-header">
-            <div>
-              <p className="section-kicker">LOCAL DEMO RECORD</p>
-              <h2 id="activity-heading">Agreement activity</h2>
-            </div>
-            <span className="activity-count">
-              {agreement.activity.length} updates
-            </span>
-          </div>
-          <div className="activity-list">
-            {agreement.activity.map((item, index) => (
-              <div className="activity-item" key={item.id}>
-                <span
-                  className={`activity-marker ${index === 0 ? "activity-marker-current" : ""}`}
-                >
-                  {index === 0 ? <Check size={14} /> : <span />}
-                </span>
-                <div className="activity-body">
-                  <strong>{item.description}</strong>
-                  <span>{item.actorName}</span>
-                </div>
-                <time dateTime={item.createdAt}>
-                  {dateTimeFormatter.format(new Date(item.createdAt))}
-                </time>
-              </div>
-            ))}
-          </div>
-          <div className="activity-footer">
-            <span>
-              <LockKeyhole size={13} /> Visible to both demo identities in this
-              browser
-            </span>
-            <button
-              onClick={() =>
-                document
-                  .getElementById("ledger")
-                  ?.scrollIntoView({ behavior: "smooth" })
-              }
-              type="button"
+            <section
+              aria-labelledby="ledger-heading"
+              className="ledger-card"
+              id="ledger"
             >
-              View ledger <ChevronRight size={14} />
-            </button>
-          </div>
-        </section>
-
-        <section
-          aria-labelledby="ledger-heading"
-          className="ledger-card"
-          id="ledger"
-        >
-          <div className="ledger-header">
-            <div>
-              <p className="section-kicker">SIMULATED TRANSACTIONS</p>
-              <h2 id="ledger-heading">Demo ledger</h2>
-            </div>
-            <span className="ledger-badge">NO REAL FUNDS</span>
-          </div>
-          {agreement.ledger.length === 0 ? (
-            <div className="ledger-empty">
-              <span>
-                <CircleDollarSign size={19} />
-              </span>
-              <p>
-                <strong>No ledger entries yet</strong>
-                <small>
-                  After terms acceptance and condition review, simulated funding
-                  and settlement steps appear here.
-                </small>
-              </p>
-            </div>
-          ) : (
-            <div className="ledger-entries">
-              {agreement.ledger.map((entry) => (
-                <div className="ledger-entry" key={entry.id}>
-                  <span
-                    className={`ledger-entry-icon ${entry.amountMinor < 0 ? "ledger-out" : "ledger-in"}`}
-                  >
-                    {entry.amountMinor < 0 ? (
-                      <ArrowUpRight size={15} />
-                    ) : (
-                      <ArrowDownLeft size={15} />
-                    )}
-                  </span>
-                  <div>
-                    <strong>{ledgerAccountLabel(entry.account)}</strong>
-                    <small>Operation {entry.operationId.slice(0, 15)}</small>
-                  </div>
-                  <span
-                    className={
-                      entry.amountMinor < 0
-                        ? "ledger-amount ledger-negative"
-                        : "ledger-amount"
-                    }
-                  >
-                    {entry.amountMinor > 0 ? "+" : ""}
-                    {formatMoney(entry.amountMinor)}
-                  </span>
+              <div className="ledger-header">
+                <div>
+                  <p className="section-kicker">SIMULATED TRANSACTIONS</p>
+                  <h2 id="ledger-heading">Demo ledger</h2>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
-
+                <span className="ledger-badge">NO REAL FUNDS</span>
+              </div>
+              {agreement.ledger.length === 0 ? (
+                <div className="ledger-empty">
+                  <span>
+                    <CircleDollarSign size={19} />
+                  </span>
+                  <p>
+                    <strong>No ledger entries yet</strong>
+                    <small>
+                      After terms acceptance and condition review, simulated
+                      funding and settlement steps appear here.
+                    </small>
+                  </p>
+                </div>
+              ) : (
+                <div className="ledger-entries">
+                  {agreement.ledger.map((entry) => (
+                    <div className="ledger-entry" key={entry.id}>
+                      <span
+                        className={`ledger-entry-icon ${entry.amountMinor < 0 ? "ledger-out" : "ledger-in"}`}
+                      >
+                        {entry.amountMinor < 0 ? (
+                          <ArrowUpRight size={15} />
+                        ) : (
+                          <ArrowDownLeft size={15} />
+                        )}
+                      </span>
+                      <div>
+                        <strong>{ledgerAccountLabel(entry.account)}</strong>
+                        <small>
+                          Operation {entry.operationId.slice(0, 15)}
+                        </small>
+                      </div>
+                      <span
+                        className={
+                          entry.amountMinor < 0
+                            ? "ledger-amount ledger-negative"
+                            : "ledger-amount"
+                        }
+                      >
+                        {entry.amountMinor > 0 ? "+" : ""}
+                        {formatMoney(entry.amountMinor)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        )}
         <footer className="page-footer">
           <span>PACT · RENTAL DEPOSIT DEMO</span>
           <span>
             <LockKeyhole size={12} /> Simulated flow · No bank connection
           </span>
-          <span>Terms version {agreement.termsVersion}.0</span>
+          <span>
+            {snapshot.setupPending
+              ? "Create your agreement to begin"
+              : `Terms version ${agreement.termsVersion}.0`}
+          </span>
         </footer>
       </div>
     </main>

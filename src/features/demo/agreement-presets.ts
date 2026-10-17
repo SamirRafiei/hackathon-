@@ -7,6 +7,7 @@ export const DEMO_AGREEMENT_PRESETS: Record<
 > = {
   APARTMENT: {
     assetType: "APARTMENT",
+    contract: { source: "demo-preset", assetType: "APARTMENT" },
     title: "Apartment security deposit",
     address: "Fictional unit DEMO-18, Budapest",
     startDate: "2026-10-01",
@@ -17,6 +18,7 @@ export const DEMO_AGREEMENT_PRESETS: Record<
   },
   EQUIPMENT: {
     assetType: "EQUIPMENT",
+    contract: { source: "demo-preset", assetType: "EQUIPMENT" },
     title: "Camera rental deposit",
     address: "Fictional camera handover desk, Budapest",
     startDate: "2026-10-16",

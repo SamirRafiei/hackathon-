@@ -58,9 +58,9 @@ async function readyForBaseline(page: Page, asset: "apartment" | "camera") {
     "aria-pressed",
     "true",
   );
-  await page
-    .getByRole("button", { name: "New agreement", exact: true })
-    .click();
+  await expect(
+    page.getByRole("heading", { name: "Set the terms together" }),
+  ).toBeVisible();
   await page
     .getByLabel("Rental type")
     .selectOption(asset === "camera" ? "EQUIPMENT" : "APARTMENT");

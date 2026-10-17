@@ -16,14 +16,15 @@ The setup form and reset apartment share `src/features/demo/agreement-presets.ts
 
 ## Loading and acceptance
 
-- **Reset demo** loads the apartment with the same dates, amount, address and terms as new apartment creation.
-- **Landlord → New agreement** opens local setup, without requiring authentication or Supabase.
-- Changing rental type loads that example’s complete sample values, including title, location, dates, amount and terms. Edit them before submission if needed.
+- A fresh visit or **Reset demo** opens the landlord creation form with apartment preset terms and its demo contract PDF. No agreement has been submitted yet. Saved agreements resume after refresh.
+- **Landlord → New agreement** opens the same setup again after an agreement exists, without authentication or Supabase.
+- Changing rental type loads that example’s complete sample values, including title, location, dates, amount, terms and contract PDF. Edit them before submission if needed.
 - **Create and accept version 1** records the owner's acceptance and replaces the current browser agreement. It does not accept for the renter.
-- **Tenant** reviews the terms, checks the acceptance box and accepts the same version. The landlord can then publish the condition baseline.
+- A contract PDF is required at creation. Keep the marked demo PDF or attach your own PDF of up to 10 MB; failed/pending uploads block creation. The tenant can open it before acceptance, including after reload in the same browser.
+- **Tenant** reviews the terms and attached contract PDF, checks the acceptance box and accepts the same version. The landlord can then publish the condition baseline.
 - The tenant reviews and acknowledges the published baseline before funding becomes available. No funds are reserved during baseline review; full simulated funding activates the rental. Use the four synthetic images and checklist inputs in [the handover runbook](handover-runbook.md).
 - On return review, the owner selects **Release full deposit** or **Start dispute**. A split proposal needs explicit renter approval; silence does not settle funds.
-- **Account setup preview** is a separate authenticated setup demonstration. It is not part of the complete local presentation path.
+- Account setup is deferred; no preview link appears in the local demo.
 
 ## Exact prefilled terms
 

@@ -1,6 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createInitialDemoSnapshot } from "@/features/demo/model";
+import { LocalDemoRepository } from "@/features/demo/repository";
 import DemoWorkspace from "@/features/demo/demo-workspace";
 
 vi.mock("@/features/handover/handover-workspace", () => ({
@@ -11,6 +13,7 @@ describe("landlord-only agreement creation", () => {
   beforeEach(() => window.localStorage.clear());
 
   it("hides creation from tenants and closes an owner's form when switching roles", async () => {
+    await new LocalDemoRepository().save(createInitialDemoSnapshot());
     const user = userEvent.setup();
     render(<DemoWorkspace />);
     await waitFor(() =>

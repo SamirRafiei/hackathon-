@@ -1,7 +1,10 @@
 "use client";
 
 import { ArrowLeft, FileText, KeyRound } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
+import { ContractLink } from "../contracts/contract-link";
+import type { AgreementContract } from "../contracts/model";
+import { BrowserContractStorage } from "../contracts/storage";
 import {
   parseDemoDepositAmount,
   validateDemoAgreementInput,
@@ -11,12 +14,14 @@ import { DEMO_AGREEMENT_PRESETS } from "@/features/demo/agreement-presets";
 
 type Props = {
   isLandlord: boolean;
+  allowCancel?: boolean;
   onCancel: () => void;
   onCreate: (input: DemoAgreementInput) => void;
 };
 
 export default function AgreementSetupForm({
   isLandlord,
+  allowCancel = true,
   onCancel,
   onCreate,
 }: Props) {
@@ -29,9 +34,18 @@ export default function AgreementSetupForm({
   const [amount, setAmount] = useState(String(initial.amountMinor / 100));
   const [terms, setTerms] = useState(initial.terms);
   const [error, setError] = useState("");
+  const [contract, setContract] = useState<AgreementContract | null>(
+    initial.contract,
+  );
+  const [uploading, setUploading] = useState(false);
+  const storage = useMemo(() => new BrowserContractStorage(), []);
+  const uploadSequence = useRef(0);
+  const uploadInFlight = useRef(false);
 
   function selectExample(type: DemoAgreementInput["assetType"]) {
     const example = DEMO_AGREEMENT_PRESETS[type];
+    if (uploadInFlight.current) return;
+    setContract(example.contract);
     setAssetType(type);
     setTitle(example.title);
     setAddress(example.address);
@@ -42,11 +56,44 @@ export default function AgreementSetupForm({
     setError("");
   }
 
+  async function attachContract(file?: File) {
+    if (!file || !isLandlord || uploadInFlight.current) return;
+    const sequence = ++uploadSequence.current;
+    uploadInFlight.current = true;
+    setUploading(true);
+    setContract(null);
+    setError("");
+    try {
+      const uploaded = await storage.upload(file);
+      if (uploadSequence.current === sequence) setContract(uploaded);
+    } catch (failure) {
+      if (uploadSequence.current === sequence)
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : "Could not attach the contract. Retry.",
+        );
+    } finally {
+      uploadInFlight.current = false;
+      setUploading(false);
+    }
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     if (!isLandlord) {
       setError("Switch to the landlord demo identity to create an agreement.");
+      return;
+    }
+    if (uploadInFlight.current) {
+      setError("Wait for the contract PDF to finish saving.");
+      return;
+    }
+    if (!contract) {
+      setError(
+        "Attach a contract PDF before creating the agreement, or use the demo contract.",
+      );
       return;
     }
     try {
@@ -58,6 +105,7 @@ export default function AgreementSetupForm({
         endDate,
         amountMinor: parseDemoDepositAmount(amount),
         terms,
+        contract,
       });
       onCreate(input);
     } catch (failure) {
@@ -113,6 +161,7 @@ export default function AgreementSetupForm({
         <label htmlFor="asset-type">Rental type</label>
         <select
           id="asset-type"
+          disabled={uploading}
           onChange={(event) =>
             selectExample(event.target.value as DemoAgreementInput["assetType"])
           }
@@ -198,6 +247,50 @@ export default function AgreementSetupForm({
           value={terms}
         />
 
+        <div className="space-y-3 rounded-2xl border border-border p-4">
+          <label htmlFor="agreement-contract">Contract PDF</label>
+          <p className="setup-warning">
+            Attach the contract the tenant will review with these terms. PDF
+            only, up to 10 MB. Files stay in this browser; use fictional
+            documents for the demo.
+          </p>
+          <input
+            id="agreement-contract"
+            type="file"
+            accept="application/pdf,.pdf"
+            disabled={!isLandlord || uploading}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              void attachContract(file);
+            }}
+          />
+          {uploading && <p role="status">Saving contract PDF…</p>}
+          {contract && <ContractLink contract={contract} />}
+          {contract && (
+            <button
+              className="secondary-action"
+              type="button"
+              disabled={uploading}
+              onClick={() => setContract(null)}
+            >
+              Remove contract
+            </button>
+          )}
+          {contract?.source !== "demo-preset" && (
+            <button
+              className="secondary-action"
+              type="button"
+              disabled={uploading}
+              onClick={() =>
+                setContract(DEMO_AGREEMENT_PRESETS[assetType].contract)
+              }
+            >
+              Use demo contract PDF
+            </button>
+          )}
+        </div>
+
         <div className="setup-policy">
           <KeyRound size={15} />
           <span>
@@ -211,12 +304,19 @@ export default function AgreementSetupForm({
           Reservation advances are not part of this flow yet.
         </p>
         <div className="setup-actions">
-          <button className="secondary-action" onClick={onCancel} type="button">
-            <ArrowLeft size={15} /> Back to agreement
-          </button>
+          {allowCancel && (
+            <button
+              className="secondary-action"
+              onClick={onCancel}
+              type="button"
+              disabled={uploading}
+            >
+              <ArrowLeft size={15} /> Back to agreement
+            </button>
+          )}
           <button
             className="primary-action"
-            disabled={!isLandlord}
+            disabled={!isLandlord || uploading}
             type="submit"
           >
             Create and accept version 1

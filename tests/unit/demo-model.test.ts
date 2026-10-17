@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from "vitest";
+import { DEMO_AGREEMENT_PRESETS } from "@/features/demo/agreement-presets";
 import { demoActors } from "@/lib/auth/identity-provider";
 import {
   returnReviewDemoSnapshot,
@@ -42,6 +43,7 @@ describe("Pact demo agreement lifecycle", () => {
   it("creates a landlord-approved version 1 and waits for tenant acceptance", () => {
     const snapshot = createDemoAgreement(demoActors.landlord, {
       assetType: "EQUIPMENT",
+      contract: DEMO_AGREEMENT_PRESETS.EQUIPMENT.contract,
       title: "Camera rental deposit",
       address: "Budapest pickup point",
       startDate: "2026-11-01",
@@ -53,6 +55,7 @@ describe("Pact demo agreement lifecycle", () => {
 
     expect(snapshot.agreement).toMatchObject({
       assetType: "EQUIPMENT",
+      contract: DEMO_AGREEMENT_PRESETS.EQUIPMENT.contract,
       title: "Camera rental deposit",
       termsVersion: 1,
       status: "AWAITING_ACCEPTANCE",
@@ -65,6 +68,7 @@ describe("Pact demo agreement lifecycle", () => {
   it("rejects tenant-created agreements and invalid terms or dates", () => {
     const input = {
       assetType: "APARTMENT" as const,
+      contract: DEMO_AGREEMENT_PRESETS.APARTMENT.contract,
       title: "Apartment deposit",
       address: "Budapest",
       startDate: "2026-11-01",

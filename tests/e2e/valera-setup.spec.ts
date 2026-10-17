@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 
 for (const width of [1280, 390]) {
@@ -7,7 +8,7 @@ for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
     await expect(
-      page.getByRole("button", { name: "Accept version 1.0" }),
+      page.getByRole("heading", { name: "Set the terms together" }),
     ).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Account setup preview" }),
@@ -16,10 +17,15 @@ for (const width of [1280, 390]) {
     await expect(
       page.getByRole("button", { name: "New agreement" }),
     ).toHaveCount(0);
-    await page
-      .getByRole("button", { name: "Switch to landlord demo identity" })
-      .click();
-    await page.getByRole("button", { name: "New agreement" }).click();
+    await expect(
+      page.getByRole("button", { name: /^MP\s*Landlord$/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByRole("button", { name: /^LM\s*Tenant$/ }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole("link", { name: /Open contract PDF/ }),
+    ).toHaveAttribute("href", "/demo-contracts/demo-apartment-contract.pdf");
     await expect(
       page.getByLabel("Agreement name", { exact: true }),
     ).toHaveValue("Apartment security deposit");
@@ -66,6 +72,19 @@ for (const width of [1280, 390]) {
     await page
       .getByLabel("Refundable deposit · EUR", { exact: true })
       .fill("300");
+    await page
+      .getByLabel("Contract PDF", { exact: true })
+      .setInputFiles(
+        fileURLToPath(
+          new URL(
+            "../../public/demo-contracts/demo-equipment-contract.pdf",
+            import.meta.url,
+          ),
+        ),
+      );
+    await expect(
+      page.getByRole("link", { name: /Open contract PDF/ }),
+    ).toHaveAttribute("href", /^blob:/);
     await create.click();
 
     await expect(
@@ -87,7 +106,23 @@ for (const width of [1280, 390]) {
     await expect(
       page.getByText("Waiting for the landlord’s condition baseline").first(),
     ).toBeVisible();
+    const contract = await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("pact-demo-v1") ?? "null").agreement
+          .contract,
+    );
+    expect(contract.source).toBe("browser-demo");
     await page.reload();
+    await expect(
+      page.getByRole("link", { name: /Open contract PDF/ }),
+    ).toHaveAttribute("href", /^blob:/);
+    expect(
+      await page.evaluate(
+        () =>
+          JSON.parse(localStorage.getItem("pact-demo-v1") ?? "null").agreement
+            .contract,
+      ),
+    ).toEqual(contract);
     await expect(
       page.getByRole("heading", { name: "Camera rental deposit" }),
     ).toBeVisible();

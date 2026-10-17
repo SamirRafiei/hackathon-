@@ -133,7 +133,7 @@ export class BrowserDemoEvidenceStorage implements EvidenceStorage {
     const record = await this.repository.get(file.id);
     if (!record)
       throw new Error(
-        "This photo is unavailable on this browser. Demo uploads do not sync between devices.",
+        "This file is unavailable on this browser. Demo uploads do not sync between devices.",
       );
     const url = URL.createObjectURL(record.blob);
     return { url, release: () => URL.revokeObjectURL(url) };

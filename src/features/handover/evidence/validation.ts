@@ -39,7 +39,7 @@ export async function validateEvidenceFile(file: File, phase: EvidencePhase) {
   }
   if (mime === "application/pdf" && phase !== "dispute") {
     throw new Error(
-      "PDF documents are allowed only for dispute evidence. Upload a photo here.",
+      "PDF documents are allowed only for dispute evidence. Upload a photo here; attach the contract during agreement setup.",
     );
   }
   return mime;

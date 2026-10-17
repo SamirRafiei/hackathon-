@@ -2,7 +2,7 @@
 
 `EvidenceUploader` and `EvidencePreview` consume the shared `EvidenceStorage` interface.
 
-The uploader exposes explicit **Upload photos** (or **Upload files** for disputes) and **Take photo** buttons with keyboard focus styles and phone-friendly targets. Native pickers are hidden behind those buttons. Optional captions apply to the next files added; previews, the attached-file count, per-file progress and remove/retry actions show what happened. Choosing a file adds a draft; the containing record's publish/submit action finalizes it. Camera capture depends on device support and falls back to the device picker on desktop.
+The uploader exposes explicit **Upload photos** (or **Upload files** for disputes) and **Take photo** buttons with keyboard focus styles and phone-friendly targets. The initial condition record accepts photos only. Contract PDFs are attached separately when setting the agreement terms. Dispute evidence still supports PDFs; previously submitted baseline files remain viewable. Native pickers are hidden behind those buttons. Optional captions apply to the next files added; previews, the attached-file count, per-file progress and remove/retry actions show what happened. Choosing a file adds a draft; the containing record's publish/submit action finalizes it. Camera capture depends on device support and falls back to the device picker on desktop.
 
 ## Explicit browser demonstration
 

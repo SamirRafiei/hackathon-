@@ -14,10 +14,10 @@ Use the existing `/` walkthrough as the presentation entry point. One owner, one
 
 | Scenario | Walkthrough | Required result |
 | --- | --- | --- |
-| Main: apartment, €1,000 | Review terms → renter accepts → owner publishes photographed baseline → renter acknowledges → simulated funding → active rental → renter submits photographed return → compare condition → owner approves full refund | €1,000 renter refund, €0 owner allocation, €0 reserved; ledger and activity survive reload |
+| Main: apartment, €1,000 | Landlord creates with preset terms and contract PDF → renter reviews terms/PDF and accepts → owner publishes photographed baseline → renter acknowledges → simulated funding → active rental → renter submits photographed return → compare condition → owner approves full refund | €1,000 renter refund, €0 owner allocation, €0 reserved; ledger and activity survive reload |
 | Backup: equipment, €300 | Create camera agreement → same acceptance/handover/return steps → owner proposes €25 with a reason → renter asks to revise → owner proposes €20 → renter explicitly approves | €280 renter refund, €20 owner allocation, €0 reserved; proposal revision and consent are visible |
 
-Owner creation already records the owner's acceptance of version 1. Make that consequence clear on the create action. Baseline publication records the owner's acknowledgement; the renter reviews and acknowledges that exact baseline before funding. Only full simulated funding then activates the rental.
+Fresh visits and Reset demo start on the landlord creation form with editable apartment terms and a marked demo contract PDF. A contract PDF is required when creating; landlords can replace the sample with a PDF of up to 10 MB. Uploaded PDFs stay in this browser via IndexedDB and remain available to the tenant after refresh. Existing saved agreements resume; older agreements without PDFs remain readable. Owner creation records the owner's acceptance of version 1. Make that consequence clear on the create action. Baseline publication records the owner's acknowledgement; the renter reviews and acknowledges that exact baseline before funding. Only full simulated funding then activates the rental.
 
 Use the full-refund branch live. Keep equipment negotiation as a rehearsed backup or show it if time allows. Creating an agreement replaces the browser's current agreement; a multi-agreement dashboard is outside this release. Use prepared sample photos and a written reset/rebuild procedure rather than building a scenario manager.
 

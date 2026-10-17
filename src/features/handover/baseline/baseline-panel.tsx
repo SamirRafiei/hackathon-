@@ -196,7 +196,8 @@ function BaselinePanelContent(props: BaselinePanelProps) {
         </h2>
         <p className="mt-1 text-sm text-slate-600">
           Record identifying details, included items and existing damage before
-          the exchange.
+          the exchange. Upload condition photos here; the contract PDF is
+          attached when setting the agreement terms.
         </p>
       </div>
       {storage.mode === "browser-demo" && (
@@ -353,8 +354,9 @@ function BaselinePanelContent(props: BaselinePanelProps) {
             onBusyChange={setUploading}
           />
           <p className="text-sm text-slate-600">
-            Publishing acknowledges this exact version as the owner. A revision
-            requires fresh borrower acknowledgment and photographs.
+            Publishing acknowledges this exact condition version as the owner.
+            The tenant reviews the photos before acknowledging. A revision
+            requires fresh tenant acknowledgment and photographs.
           </p>
           <button
             type="button"

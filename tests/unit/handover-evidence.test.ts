@@ -64,12 +64,15 @@ describe("evidence validation", () => {
       "contents must match",
     );
   });
-  it("restricts documents to dispute evidence and rejects empty and large files", async () => {
+  it("restricts PDFs to disputes and rejects empty and large files", async () => {
     const pdf = new NodeFile(["%PDF-1.7"], "receipt.pdf", {
       type: "application/pdf",
     }) as unknown as File;
     await expect(validateEvidenceFile(pdf, "dispute")).resolves.toBe(
       "application/pdf",
+    );
+    await expect(validateEvidenceFile(pdf, "baseline")).rejects.toThrow(
+      "only for dispute",
     );
     await expect(validateEvidenceFile(pdf, "return")).rejects.toThrow(
       "only for dispute",

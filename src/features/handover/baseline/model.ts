@@ -115,7 +115,7 @@ export function publishBaseline(input: PublishBaselineInput): BaselineRecord {
     )
   )
     throw new Error(
-      "Every photograph must be finalized for this agreement and owner.",
+      "Every attached file must be finalized for this agreement and owner.",
     );
   return {
     id: input.id,

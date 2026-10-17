@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  contractSchema,
+  type AgreementContract,
+} from "@/features/agreements/contracts/model";
 import { DEMO_AGREEMENT_PRESETS } from "./agreement-presets";
 import type {
   BaselineRecord,
@@ -66,6 +70,7 @@ export type DemoAgreement = {
   startDate: string;
   endDate: string;
   termsVersion: number;
+  contract?: AgreementContract;
   amountMinor: number;
   currency: typeof DEMO_CURRENCY;
   status: AgreementStatus;
@@ -79,6 +84,7 @@ export type DemoAgreement = {
 
 export type DemoSnapshot = {
   activeActorId: "demo-landlord" | "demo-tenant";
+  setupPending?: boolean;
   agreement: DemoAgreement;
 };
 
@@ -115,6 +121,7 @@ const proposalSchema = z.object({
 export const demoSnapshotSchema = z
   .object({
     activeActorId: z.enum(["demo-landlord", "demo-tenant"]),
+    setupPending: z.boolean().optional(),
     agreement: z.object({
       id: z.string(),
       assetType: z.enum(["APARTMENT", "EQUIPMENT"]).default("APARTMENT"),
@@ -129,6 +136,7 @@ export const demoSnapshotSchema = z
       startDate: z.string(),
       endDate: z.string(),
       termsVersion: z.number().int().positive(),
+      contract: contractSchema.optional(),
       amountMinor: z.number().safe().int().positive(),
       currency: z.literal(DEMO_CURRENCY),
       status: z.enum([
@@ -340,6 +348,14 @@ export function createInitialDemoSnapshot(): DemoSnapshot {
   };
 }
 
+export function createDemoSetupSnapshot(): DemoSnapshot {
+  return {
+    ...createInitialDemoSnapshot(),
+    activeActorId: demoActors.landlord.id,
+    setupPending: true,
+  };
+}
+
 export function actorForId(id: DemoSnapshot["activeActorId"]): PactActor {
   return id === demoActors.landlord.id
     ? demoActors.landlord
@@ -354,11 +370,13 @@ export type DemoAgreementInput = {
   endDate: string;
   amountMinor: number;
   terms: string;
+  contract: AgreementContract;
 };
 
 const agreementInputSchema = z
   .object({
     assetType: z.enum(["APARTMENT", "EQUIPMENT"]),
+    contract: contractSchema,
     title: z.string().trim().min(1, "Add a name for this agreement.").max(120),
     address: z.string().trim().min(1, "Add the rental location.").max(240),
     startDate: z.iso.date({ error: "Enter a valid rental start date." }),
@@ -400,11 +418,19 @@ export function parseDemoDepositAmount(value: string): number {
 export function validateDemoAgreementInput(
   input: DemoAgreementInput,
 ): DemoAgreementInput {
+  if (!input.contract)
+    throw new Error("Attach a contract PDF before creating the agreement.");
   const parsed = agreementInputSchema.safeParse(input);
   if (!parsed.success) {
     throw new Error(
       parsed.error.issues[0]?.message ?? "Check the agreement details.",
     );
+  }
+  if (
+    parsed.data.contract.source === "demo-preset" &&
+    parsed.data.contract.assetType !== parsed.data.assetType
+  ) {
+    throw new Error("Choose a demo contract matching the rental type.");
   }
   return parsed.data;
 }
@@ -424,6 +450,7 @@ export function createDemoAgreement(
       title: values.title,
       address: values.address,
       terms: values.terms,
+      contract: values.contract,
       startDate: values.startDate,
       endDate: values.endDate,
       termsVersion: 1,
@@ -483,6 +510,8 @@ export function acceptTerms(
     throw new Error("These terms are no longer awaiting acceptance.");
   }
   requireRole(actor, "tenant");
+  if (snapshot.setupPending)
+    throw new Error("The landlord must create the agreement first.");
   if (snapshot.agreement.acceptedBy.tenant) {
     throw new Error("You have already accepted this version.");
   }
