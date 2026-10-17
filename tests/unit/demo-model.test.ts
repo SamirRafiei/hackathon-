@@ -8,6 +8,7 @@ import {
   approveFullRefund,
   approveSplit,
   createInitialDemoSnapshot,
+  createDemoAgreement,
   declineSplit,
   fundAgreement,
   proposeSplit,
@@ -38,6 +39,46 @@ function expectBalancedLedger(
 }
 
 describe("Pact demo agreement lifecycle", () => {
+  it("creates a landlord-approved version 1 and waits for tenant acceptance", () => {
+    const snapshot = createDemoAgreement(demoActors.landlord, {
+      assetType: "EQUIPMENT",
+      title: "Camera rental deposit",
+      address: "Budapest pickup point",
+      startDate: "2026-11-01",
+      endDate: "2026-11-08",
+      amountMinor: 30_000,
+      terms:
+        "Return the camera and listed accessories in the recorded condition.",
+    });
+
+    expect(snapshot.agreement).toMatchObject({
+      assetType: "EQUIPMENT",
+      title: "Camera rental deposit",
+      termsVersion: 1,
+      status: "AWAITING_ACCEPTANCE",
+      acceptedBy: { landlord: true, tenant: false },
+      amountMinor: 30_000,
+    });
+    expect(snapshot.agreement.ledger).toHaveLength(0);
+  });
+
+  it("rejects tenant-created agreements and invalid terms or dates", () => {
+    const input = {
+      assetType: "APARTMENT" as const,
+      title: "Apartment deposit",
+      address: "Budapest",
+      startDate: "2026-11-01",
+      endDate: "2026-10-31",
+      amountMinor: 30_000,
+      terms: "Short",
+    };
+
+    expect(() => createDemoAgreement(demoActors.tenant, input)).toThrow(
+      "Switch to the landlord demo identity to do this.",
+    );
+    expect(() => createDemoAgreement(demoActors.landlord, input)).toThrow();
+  });
+
   it("starts with landlord acceptance and waits for the tenant", () => {
     const snapshot = createInitialDemoSnapshot();
 
@@ -59,6 +100,17 @@ describe("Pact demo agreement lifecycle", () => {
       landlord: true,
       tenant: true,
     });
+  });
+
+  it("does not let the landlord accept for the tenant or accept twice", () => {
+    const initial = createInitialDemoSnapshot();
+    expect(() => acceptTerms(initial, demoActors.landlord)).toThrow(
+      "Switch to the tenant demo identity to do this.",
+    );
+    const accepted = acceptTerms(initial, demoActors.tenant);
+    expect(() => acceptTerms(accepted, demoActors.tenant)).toThrow(
+      "These terms are no longer awaiting acceptance.",
+    );
   });
 
   it("allows only the tenant to fund, and records a balanced reservation", () => {

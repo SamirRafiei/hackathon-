@@ -21,6 +21,20 @@ describe("LocalDemoRepository", () => {
     expect(await repository.load()).toEqual(snapshot);
   });
 
+  it("loads demo saves written before asset type and agreement terms were added", async () => {
+    const repository = new LocalDemoRepository();
+    const snapshot = createInitialDemoSnapshot();
+    const legacy = structuredClone(snapshot);
+    delete (legacy.agreement as Partial<typeof legacy.agreement>).assetType;
+    delete (legacy.agreement as Partial<typeof legacy.agreement>).terms;
+    window.localStorage.setItem("pact-demo-v1", JSON.stringify(legacy));
+
+    const loaded = await repository.load();
+
+    expect(loaded?.agreement.assetType).toBe("APARTMENT");
+    expect(loaded?.agreement.terms).toContain("48-hour return review");
+  });
+
   it("ignores malformed or invalid stored snapshots", async () => {
     const repository = new LocalDemoRepository();
     window.localStorage.setItem("pact-demo-v1", "not-json");

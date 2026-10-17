@@ -1,5 +1,5 @@
 # Agreements — Valera Murzin
 
-Home for agreement forms, revisions, invitation claiming, and current-version acceptance. Related routes: login/signup, invitations, agreement creation, and agreement terms/review.
+Home for agreement forms, revisions, invitation claiming, and current-version acceptance. `components/agreement-setup-form.tsx` provides local demo setup for apartment and equipment security deposits. `src/features/demo/model.ts` validates and creates a version-one demo snapshot; the tenant must confirm the displayed version before accepting it.
 
-Use `src/lib/auth/` for shared identity and membership checks. Coordinate immutable version snapshots and participant/share contracts with Sameer. No feature logic is implemented here yet; follow `plan.md`.
+The setup and acceptance flow is browser-local and must remain clearly labeled as a demo. It is not a persistent agreement or proof of assent. Use `src/lib/auth/` for any future verified identity and membership checks. Coordinate immutable version snapshots and participant/share contracts with the database workstream; follow `plan.md` before implementing authenticated routes or RPC adapters.
