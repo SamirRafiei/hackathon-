@@ -2,6 +2,8 @@
 
 `EvidenceUploader` and `EvidencePreview` consume the shared `EvidenceStorage` interface.
 
+The uploader exposes explicit **Upload photos** (or **Upload files** for disputes) and **Take photo** buttons with keyboard focus styles and phone-friendly targets. Native pickers are hidden behind those buttons. Optional captions apply to the next files added; previews, the attached-file count, per-file progress and remove/retry actions show what happened. Choosing a file adds a draft; the containing record's publish/submit action finalizes it. Camera capture depends on device support and falls back to the device picker on desktop.
+
 ## Explicit browser demonstration
 
 `BrowserDemoEvidenceStorage` stores actual file blobs and metadata in IndexedDB on this browser. It does not transfer files to Supabase, authenticate actors, synchronize devices, or provide tamper resistance against this browser's user. Finalized files cannot be removed through the adapter. Clearing browser data removes demo evidence. The caller must also persist the containing condition record; file persistence alone does not publish a baseline or return.

@@ -43,6 +43,10 @@ Full settlement browser journeys, deployment smoke checks and the final rehearsa
 
 Validation: `npm run check` passed (231 unit/component/database tests, lint, TypeScript, formatting and production build), plus all six Chromium evidence browser checks. Document links and diff whitespace checks passed. The mobile comparison screenshots were reviewed; physical-device capture and final hosted-origin checks remain unverified.
 
+## Upload UI checkpoint — 17 October 2026
+
+replaced raw native file controls with prominent upload/camera buttons, supported-format/size guidance, optional caption help, an attached-file count, named upload progress and visible remove actions. File-count/disabled/submission guards are retained. Validation: `npm run check` passed with 236 tests; all six evidence browser checks passed using the keyboard-operated upload button and real file chooser. Two follow-up browser checks captured/reviewed the 390 px uploader and verified revised-baseline previews. No horizontal overflow was found. Physical-device camera capture remains unverified.
+
 ## Post-demo backend handoff
 
 - Sameer/Valera coordination: implement authenticated gateway preparation/finalization/draft-removal operations and compose them with `signedEvidenceDownload`. UI `baseline` corresponds to the existing SQL/domain `collection` evidence phase; explicitly translate that phase and return server-allocated private paths. Arrival needs an agreed schema extension. Never trust browser paths or actor IDs.

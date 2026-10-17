@@ -34,6 +34,51 @@ function storage(): EvidenceStorage {
   };
 }
 describe("private evidence controls", () => {
+  it("opens the correct picker from the upload and camera buttons", () => {
+    render(
+      <EvidenceUploader
+        agreementId="pact"
+        phase="baseline"
+        actor={{ id: "owner", displayName: "Owner", role: "owner" }}
+        storage={storage()}
+        files={[]}
+        onChange={vi.fn()}
+      />,
+    );
+    const choose = vi.spyOn(
+      screen.getByLabelText("Choose evidence files"),
+      "click",
+    );
+    const camera = vi.spyOn(
+      screen.getByLabelText("Take condition photo"),
+      "click",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Upload photos" }));
+    expect(choose).toHaveBeenCalledOnce();
+    expect(camera).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Take photo" }));
+    expect(camera).toHaveBeenCalledOnce();
+    expect(screen.getByText("No files attached yet")).toBeInTheDocument();
+  });
+  it("disables both pickers when the record reaches its file limit", async () => {
+    render(
+      <EvidenceUploader
+        agreementId="pact"
+        phase="dispute"
+        actor={{ id: "owner", displayName: "Owner", role: "owner" }}
+        storage={storage()}
+        files={Array.from({ length: 12 }, (_, index) => ({
+          ...file,
+          id: String(index),
+        }))}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Upload files" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Take photo" })).toBeDisabled();
+    expect(screen.getByText(/File limit reached/)).toBeInTheDocument();
+    await screen.findAllByAltText("Before handover");
+  });
   it("offers recoverable errors for image decode failures and does not change submitted evidence", async () => {
     const adapter = storage();
     const submitted = { ...file, submittedAt: "2026-10-17T12:00:00Z" };

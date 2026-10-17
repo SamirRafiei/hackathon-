@@ -1,6 +1,14 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import {
+  Camera,
+  Check,
+  ImagePlus,
+  LoaderCircle,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import type {
   EvidenceFile,
   EvidencePhase,
@@ -38,6 +46,9 @@ export function EvidenceUploader({
 }: EvidenceUploaderProps) {
   const id = useId();
   const [caption, setCaption] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
+  const [activeFile, setActiveFile] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     onBusyChange?.(busy);
@@ -53,6 +64,9 @@ export function EvidenceUploader({
     phase === "dispute"
       ? "image/jpeg,image/png,image/webp,application/pdf"
       : "image/jpeg,image/png,image/webp";
+  const atLimit = files.length >= MAX_EVIDENCE_FILES;
+  const cannotAdd = disabled || busy || atLimit;
+  const documents = phase === "dispute";
   async function upload(selected: File[]) {
     if (lock.current || disabled || !selected.length) return;
     if (currentFiles.current.length + selected.length > MAX_EVIDENCE_FILES) {
@@ -66,6 +80,7 @@ export function EvidenceUploader({
     const next = [...currentFiles.current];
     for (let index = 0; index < selected.length; index++) {
       setProgress(0);
+      setActiveFile(selected[index].name);
       try {
         const file = await storage.upload({
           agreementId,
@@ -85,6 +100,7 @@ export function EvidenceUploader({
       }
     }
     setBusy(false);
+    setActiveFile("");
     lock.current = false;
   }
   async function remove(file: EvidenceFile) {
@@ -113,24 +129,108 @@ export function EvidenceUploader({
   return (
     <section
       aria-label={`${phase} evidence`}
-      className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4"
+      className="min-w-0 space-y-4 rounded-2xl border border-border bg-white p-4 sm:p-5"
     >
       <div>
-        <h3 className="font-semibold text-slate-900">Condition evidence</h3>
-        <p className="mt-1 text-sm text-slate-600">
-          JPEG, PNG or WebP{phase === "dispute" ? ", or PDF documents" : ""}. Up
-          to 10 MB each, {MAX_EVIDENCE_FILES} files per record.
+        <h3 className="font-semibold text-foreground">
+          {documents ? "Add supporting files" : "Add condition photos"}
+        </h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {documents
+            ? "Choose photos or documents"
+            : "Choose photos from your device"}
+          , then review them below. They are submitted when you publish or
+          submit this record.
         </p>
-        {storage.mode === "browser-demo" ? (
-          <p className="mt-1 text-xs text-amber-800">
-            Browser demo: files stay on this browser and are not shared with
-            other devices.
+      </div>
+      <div className="rounded-xl border-2 border-dashed border-border bg-muted/40 p-4 sm:p-6">
+        <div className="flex items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-white text-foreground">
+            <ImagePlus aria-hidden="true" size={21} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">
+              {files.length ? "Add more evidence" : "Start with a clear photo"}
+            </p>
+            <p
+              id={`${id}-limits`}
+              className="mt-1 text-xs leading-relaxed text-muted-foreground"
+            >
+              JPEG, PNG or WebP{documents ? ", or PDF documents" : ""}. Up to 10
+              MB each · {MAX_EVIDENCE_FILES} files per record.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <button
+            type="button"
+            disabled={cannotAdd}
+            onClick={() => fileInput.current?.click()}
+            aria-controls={`${id}-files`}
+            aria-describedby={`${id}-limits`}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Upload aria-hidden="true" size={17} />
+            {documents ? "Upload files" : "Upload photos"}
+          </button>
+          <button
+            type="button"
+            disabled={cannotAdd}
+            onClick={() => cameraInput.current?.click()}
+            aria-controls={`${id}-camera`}
+            aria-describedby={`${id}-camera-help`}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border bg-white px-5 py-3 text-sm font-semibold text-foreground transition hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Camera aria-hidden="true" size={17} /> Take photo
+          </button>
+        </div>
+        <p
+          id={`${id}-camera-help`}
+          className="mt-3 text-xs text-muted-foreground"
+        >
+          On supported phones, “Take photo” opens your camera. On a computer,
+          choose an existing photo.
+        </p>
+        {atLimit && (
+          <p role="status" className="mt-2 text-sm font-medium">
+            File limit reached. Remove a draft to add another file.
           </p>
-        ) : null}
+        )}
+        <input
+          ref={fileInput}
+          id={`${id}-files`}
+          aria-label="Choose evidence files"
+          type="file"
+          accept={accept}
+          multiple
+          hidden
+          disabled={cannotAdd}
+          onChange={(event) => {
+            const selected = Array.from(event.target.files ?? []);
+            event.target.value = "";
+            void upload(selected);
+          }}
+        />
+        <input
+          ref={cameraInput}
+          id={`${id}-camera`}
+          aria-label="Take condition photo"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          capture="environment"
+          hidden
+          disabled={cannotAdd}
+          onChange={(event) => {
+            const selected = Array.from(event.target.files ?? []);
+            event.target.value = "";
+            void upload(selected);
+          }}
+        />
       </div>
       <div>
         <label htmlFor={`${id}-caption`} className="block text-sm font-medium">
-          Caption for new files
+          Caption for new files{" "}
+          <span className="font-normal text-muted-foreground">(optional)</span>
         </label>
         <input
           id={`${id}-caption`}
@@ -141,50 +241,33 @@ export function EvidenceUploader({
           className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2"
           placeholder="Describe the condition or identifying details"
         />
-      </div>
-      <div className="flex flex-wrap gap-3">
-        <label className="text-sm font-medium">
-          Choose files
-          <input
-            aria-label="Choose evidence files"
-            type="file"
-            accept={accept}
-            multiple
-            disabled={disabled || busy || files.length >= MAX_EVIDENCE_FILES}
-            className="mt-1 block max-w-full text-sm"
-            onChange={(event) => {
-              const selected = Array.from(event.target.files ?? []);
-              event.target.value = "";
-              void upload(selected);
-            }}
-          />
-        </label>
-        <label className="text-sm font-medium">
-          Take a photo
-          <input
-            aria-label="Take condition photo"
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            capture="environment"
-            disabled={disabled || busy || files.length >= MAX_EVIDENCE_FILES}
-            className="mt-1 block max-w-full text-sm"
-            onChange={(event) => {
-              const selected = Array.from(event.target.files ?? []);
-              event.target.value = "";
-              void upload(selected);
-            }}
-          />
-        </label>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Applies to the next files you add.
+        </p>
       </div>
       {busy ? (
-        <div role="status" className="text-sm">
-          <p>Saving evidence… {progress}%</p>
-          <progress
-            aria-label="Evidence upload progress"
-            value={progress}
-            max={100}
-            className="w-full"
-          />
+        <div
+          role="status"
+          className="space-y-2 rounded-xl bg-muted p-3 text-sm"
+        >
+          <p className="flex items-center gap-2 break-all">
+            <LoaderCircle
+              aria-hidden="true"
+              size={16}
+              className="shrink-0 animate-spin"
+            />
+            {activeFile
+              ? `Uploading ${activeFile} · ${progress}%`
+              : "Removing file…"}
+          </p>
+          {activeFile && (
+            <progress
+              aria-label="Evidence upload progress"
+              value={progress}
+              max={100}
+              className="w-full"
+            />
+          )}
         </div>
       ) : null}
       {error ? (
@@ -205,7 +288,19 @@ export function EvidenceUploader({
           ) : null}
         </div>
       ) : null}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div
+        className="flex items-center justify-between gap-2 text-sm"
+        aria-live="polite"
+      >
+        <p className="inline-flex items-center gap-2 font-medium">
+          {files.length > 0 && <Check aria-hidden="true" size={16} />}
+          {files.length ? "Attached files" : "No files attached yet"}
+        </p>
+        <span className="shrink-0 text-muted-foreground">
+          {files.length} / {MAX_EVIDENCE_FILES}
+        </span>
+      </div>
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         {files.map((file) => (
           <div key={file.id} className="space-y-2">
             <EvidencePreview file={file} storage={storage} />
@@ -214,14 +309,21 @@ export function EvidenceUploader({
                 type="button"
                 disabled={disabled || busy}
                 onClick={() => void remove(file)}
-                className="text-sm font-medium text-rose-700 underline disabled:opacity-50"
+                aria-label={`Remove ${file.fileName}`}
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-rose-200 px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
               >
-                Remove {file.fileName}
+                <Trash2 aria-hidden="true" size={15} /> Remove file
               </button>
             ) : null}
           </div>
         ))}
       </div>
+      {storage.mode === "browser-demo" && (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Demo files stay in this browser. They are not shared with other
+          devices.
+        </p>
+      )}
     </section>
   );
 }

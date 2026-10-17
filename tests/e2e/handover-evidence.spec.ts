@@ -142,10 +142,22 @@ async function publish(
   await panel
     .getByRole("textbox", { name: "Caption for new files" })
     .fill(`${asset} baseline — synthetic demo`);
+  const picker = page.waitForEvent("filechooser");
   await panel
-    .getByLabel("Choose evidence files")
-    .setInputFiles(fixture(`${asset}-baseline`));
-  await expect(panel.locator("img")).toBeVisible();
+    .getByRole("button", { name: "Upload photos", exact: true })
+    .focus();
+  await page.keyboard.press("Enter");
+  await (await picker).setFiles(fixture(`${asset}-baseline`));
+  const uploader = panel.getByRole("region", {
+    name: "baseline evidence",
+    exact: true,
+  });
+  await expect(uploader.locator("img")).toBeVisible();
+  await uploader.screenshot({
+    path: test
+      .info()
+      .outputPath(`uploader-${asset}${revision ? "-revision" : ""}.png`),
+  });
   await expect(
     panel.getByRole("button", { name: "Publish condition record" }),
   ).toBeEnabled();
