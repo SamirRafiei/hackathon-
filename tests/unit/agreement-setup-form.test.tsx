@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import AgreementSetupForm from "@/features/agreements/components/agreement-setup-form";
@@ -29,11 +29,12 @@ describe("AgreementSetupForm", () => {
   });
 
   it("does not enable agreement creation for the tenant demo identity", () => {
+    const onCreate = vi.fn();
     render(
       <AgreementSetupForm
         isLandlord={false}
         onCancel={vi.fn()}
-        onCreate={vi.fn()}
+        onCreate={onCreate}
       />,
     );
 
@@ -43,5 +44,9 @@ describe("AgreementSetupForm", () => {
     expect(
       screen.getByRole("button", { name: "Create and accept version 1" }),
     ).toBeDisabled();
+    const form = screen.getByLabelText("Rental type").closest("form");
+    if (!form) throw new Error("Agreement form missing");
+    fireEvent.submit(form);
+    expect(onCreate).not.toHaveBeenCalled();
   });
 });

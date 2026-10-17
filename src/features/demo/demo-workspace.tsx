@@ -204,6 +204,7 @@ export default function DemoWorkspace() {
     setSnapshot(next);
     setNotice("");
     setTenantConfirmedTerms(false);
+    setShowSetup(false);
     void repository.save(next);
   }
 
@@ -322,13 +323,15 @@ export default function DemoWorkspace() {
               clear for everyone.
             </p>
           </div>
-          <button
-            className="reset-button"
-            onClick={() => setShowSetup((visible) => !visible)}
-            type="button"
-          >
-            <Plus size={15} /> New agreement
-          </button>
+          {isLandlord && (
+            <button
+              className="reset-button"
+              onClick={() => setShowSetup((visible) => !visible)}
+              type="button"
+            >
+              <Plus size={15} /> New agreement
+            </button>
+          )}
           <button
             className="reset-button"
             onClick={() => void resetDemo()}
@@ -358,7 +361,7 @@ export default function DemoWorkspace() {
           </div>
         )}
 
-        {showSetup && (
+        {showSetup && isLandlord && (
           <AgreementSetupForm
             isLandlord={isLandlord}
             onCancel={() => setShowSetup(false)}

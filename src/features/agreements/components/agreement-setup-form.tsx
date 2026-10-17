@@ -28,6 +28,7 @@ export default function AgreementSetupForm({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!isLandlord) return;
     onCreate({
       assetType,
       title,
