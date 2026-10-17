@@ -19,6 +19,9 @@ for (const width of [1280, 390]) {
 
     async function propose(amount: string, reason: string) {
       await page
+        .getByRole("button", { name: "Start dispute", exact: true })
+        .click();
+      await page
         .getByLabel("Landlord allocation", { exact: true })
         .fill(amount);
       await page.getByLabel("Reason", { exact: true }).fill(reason);

@@ -15,17 +15,94 @@ import {
   conditionPhoto,
   declaredReturn,
   fixtureTime,
+  publishedBaselineSnapshot,
+  reviewedBaselineSnapshot,
 } from "./fixtures/handover";
 
 describe("handover and demo integration", () => {
-  it("blocks a funded agreement from skipping both baseline acknowledgments", () => {
-    const funded = fundAgreement(
-      acceptTerms(createInitialDemoSnapshot(), demoActors.tenant),
+  it("requires accepted terms, owner publication and tenant review before funding", () => {
+    const accepted = acceptTerms(
+      createInitialDemoSnapshot(),
       demoActors.tenant,
     );
-    expect(() => submitReturn(funded, demoActors.tenant)).toThrow(
-      "acknowledge the baseline",
+    const published = publishedBaselineSnapshot();
+    const reviewed = reviewedBaselineSnapshot();
+    expect(accepted.agreement.status).toBe("AWAITING_BASELINE");
+    expect(() => fundAgreement(accepted, demoActors.tenant)).toThrow();
+    // Also guard older accepted saves using the former AWAITING_FUNDING status.
+    expect(() =>
+      fundAgreement(
+        {
+          ...accepted,
+          agreement: { ...accepted.agreement, status: "AWAITING_FUNDING" },
+        },
+        demoActors.tenant,
+      ),
+    ).toThrow("current condition baseline");
+    expect(() => fundAgreement(published, demoActors.tenant)).toThrow(
+      "current condition baseline",
     );
+    for (const snapshot of [accepted, published, reviewed]) {
+      expect(snapshot.agreement.reservedMinor).toBe(0);
+      expect(snapshot.agreement.ledger).toEqual([]);
+      expect(demoSnapshotSchema.safeParse(snapshot).success).toBe(true);
+      expect(() => submitReturn(snapshot, demoActors.tenant)).toThrow(
+        "must be funded",
+      );
+    }
+    expect(fundAgreement(reviewed, demoActors.tenant).agreement.status).toBe(
+      "ACTIVE",
+    );
+  });
+  it("rejects baseline publication before tenant acceptance", () => {
+    const baseline = publishedBaselineSnapshot().agreement.handover?.baseline;
+    if (!baseline) throw new Error("missing fixture");
+    expect(() =>
+      recordBaseline(
+        createInitialDemoSnapshot(),
+        demoActors.landlord,
+        baseline,
+      ),
+    ).toThrow("accepted terms");
+  });
+  it("resets tenant review when the landlord publishes a baseline revision", () => {
+    const reviewed = reviewedBaselineSnapshot();
+    const baseline = reviewed.agreement.handover?.baseline;
+    if (!baseline) throw new Error("missing fixture");
+    const revised = recordBaseline(reviewed, demoActors.landlord, {
+      ...baseline,
+      id: "baseline-2",
+      version: 2,
+      notes: "Updated condition",
+      acknowledgedBy: { [demoActors.landlord.id]: fixtureTime },
+    });
+    expect(
+      revised.agreement.handover?.baseline?.acknowledgedBy[
+        demoActors.tenant.id
+      ],
+    ).toBeUndefined();
+    expect(() => fundAgreement(revised, demoActors.tenant)).toThrow(
+      "current condition baseline",
+    );
+    expect(revised.agreement.reservedMinor).toBe(0);
+  });
+  it("lets legacy funded saves finish baseline review without funding twice", () => {
+    const active = activeDemoSnapshot();
+    const published = publishedBaselineSnapshot();
+    const legacy = {
+      ...active,
+      agreement: {
+        ...active.agreement,
+        status: "FUNDED" as const,
+        handover: published.agreement.handover,
+      },
+    };
+    const baseline = active.agreement.handover?.baseline;
+    if (!baseline) throw new Error("missing fixture");
+    const result = recordBaseline(legacy, demoActors.tenant, baseline);
+    expect(result.agreement.status).toBe("ACTIVE");
+    expect(result.agreement.ledger).toEqual(active.agreement.ledger);
+    expect(() => fundAgreement(result, demoActors.tenant)).toThrow();
   });
   it("activates only after baseline consent and preserves evidence after serialized reload", () => {
     const active = activeDemoSnapshot();

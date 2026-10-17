@@ -1,11 +1,11 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { LocalDemoRepository } from "@/features/demo/repository";
+import { createInitialDemoSnapshot } from "@/features/demo/model";
 import {
-  acceptTerms,
-  createInitialDemoSnapshot,
-  fundAgreement,
-} from "@/features/demo/model";
-import { demoActors } from "@/lib/auth/identity-provider";
+  activeDemoSnapshot,
+  publishedBaselineSnapshot,
+  reviewedBaselineSnapshot,
+} from "./fixtures/handover";
 
 describe("LocalDemoRepository", () => {
   beforeEach(() => {
@@ -49,10 +49,7 @@ describe("LocalDemoRepository", () => {
 
   it("rejects snapshots with tampered financial state", async () => {
     const repository = new LocalDemoRepository();
-    const funded = fundAgreement(
-      acceptTerms(createInitialDemoSnapshot(), demoActors.tenant),
-      demoActors.tenant,
-    );
+    const funded = activeDemoSnapshot();
     const tampered = {
       ...funded,
       agreement: {
@@ -64,6 +61,34 @@ describe("LocalDemoRepository", () => {
     window.localStorage.setItem("pact-demo-v1", JSON.stringify(tampered));
 
     expect(await repository.load()).toBeNull();
+  });
+
+  it("preserves published and reviewed baselines before any funds are reserved", async () => {
+    const repository = new LocalDemoRepository();
+    for (const snapshot of [
+      publishedBaselineSnapshot(),
+      reviewedBaselineSnapshot(),
+    ]) {
+      await repository.save(snapshot);
+      expect(await repository.load()).toEqual(snapshot);
+      expect(snapshot.agreement.reservedMinor).toBe(0);
+      expect(snapshot.agreement.ledger).toEqual([]);
+    }
+  });
+
+  it("loads funding-first legacy saves without losing reserved funds", async () => {
+    const repository = new LocalDemoRepository();
+    const active = activeDemoSnapshot();
+    const legacy = {
+      ...active,
+      agreement: {
+        ...active.agreement,
+        status: "FUNDED" as const,
+        handover: undefined,
+      },
+    };
+    await repository.save(legacy);
+    expect(await repository.load()).toEqual(legacy);
   });
 
   it("removes the saved snapshot when reset", async () => {

@@ -53,3 +53,7 @@ replaced raw native file controls with prominent upload/camera buttons, supporte
 - Sameer: provide authoritative baseline version/acknowledgment and return-declaration transactions with server timestamps. Browser models are not authority; the local deadline is displayed but does not run automatic refunds.
 - Aiperi: import `EvidenceComparison` and pass the authorized case's matching baseline/return records, participant-name map and storage adapter. Arrival discrepancies supply evidence but do not automatically open/settle a case.
 - Hayk: the demo now uses `ACTIVE` after both baseline acknowledgments. Include that state in separate dashboard integration. Evidence/inspection submissions leave financial balances unchanged.
+
+## Updated agreement order
+
+The local walkthrough now requires tenant terms acceptance before landlord baseline publication. The tenant reviews and acknowledges that baseline before funding; full simulated funding activates the rental. Baseline revisions before funding reset tenant acknowledgement. `FUNDED` remains readable for older funding-first browser saves, so those deposits are preserved and activation still requires baseline consent. The separate backend lifecycle remains an integration task.

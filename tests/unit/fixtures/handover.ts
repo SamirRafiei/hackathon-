@@ -1,4 +1,5 @@
 import { demoActors } from "@/lib/auth/identity-provider";
+import { DEMO_AGREEMENT_PRESETS } from "@/features/demo/agreement-presets";
 import {
   acceptTerms,
   createInitialDemoSnapshot,
@@ -38,13 +39,10 @@ export function conditionPhoto(
     submittedAt: fixtureTime,
   };
 }
-export function activeDemoSnapshot(
+export function publishedBaselineSnapshot(
   initial: DemoSnapshot = createInitialDemoSnapshot(),
 ) {
-  let snapshot = fundAgreement(
-    acceptTerms(initial, demoActors.tenant),
-    demoActors.tenant,
-  );
+  let snapshot = acceptTerms(initial, demoActors.tenant);
   const baseline = publishBaseline({
     id: "baseline-1",
     agreementId: snapshot.agreement.id,
@@ -71,6 +69,14 @@ export function activeDemoSnapshot(
     now: fixtureTime,
   });
   snapshot = recordBaseline(snapshot, demoActors.landlord, baseline);
+  return snapshot;
+}
+export function reviewedBaselineSnapshot(
+  initial: DemoSnapshot = createInitialDemoSnapshot(),
+) {
+  const snapshot = publishedBaselineSnapshot(initial);
+  const baseline = snapshot.agreement.handover?.baseline;
+  if (!baseline) throw new Error("Fixture baseline missing");
   const acknowledged = acknowledgeBaseline({
     record: baseline,
     agreementId: snapshot.agreement.id,
@@ -83,6 +89,11 @@ export function activeDemoSnapshot(
     now: fixtureTime,
   });
   return recordBaseline(snapshot, demoActors.tenant, acknowledged);
+}
+export function activeDemoSnapshot(
+  initial: DemoSnapshot = createInitialDemoSnapshot(),
+) {
+  return fundAgreement(reviewedBaselineSnapshot(initial), demoActors.tenant);
 }
 export function declaredReturn(snapshot = activeDemoSnapshot()) {
   const baseline = snapshot.agreement.handover?.baseline;
@@ -124,16 +135,7 @@ export function returnReviewDemoSnapshot() {
 
 export function equipmentReturnReviewDemoSnapshot() {
   const active = activeDemoSnapshot(
-    createDemoAgreement(demoActors.landlord, {
-      assetType: "EQUIPMENT",
-      title: "Camera rental deposit",
-      address: "Demo camera pickup desk, Budapest",
-      startDate: "2026-11-01",
-      endDate: "2026-11-08",
-      amountMinor: 30_000,
-      terms:
-        "Return camera DEMO-CAM-001 and all listed accessories in the recorded condition. Review within 48 hours; allocations require renter approval.",
-    }),
+    createDemoAgreement(demoActors.landlord, DEMO_AGREEMENT_PRESETS.EQUIPMENT),
   );
   return submitReturn(active, demoActors.tenant, declaredReturn(active));
 }

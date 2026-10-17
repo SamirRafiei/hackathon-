@@ -14,10 +14,10 @@ Use the existing `/` walkthrough as the presentation entry point. One owner, one
 
 | Scenario | Walkthrough | Required result |
 | --- | --- | --- |
-| Main: apartment, €1,000 | Review terms → renter accepts → simulated funding → owner publishes photographed baseline → renter acknowledges → active rental → renter submits photographed return → compare condition → owner approves full refund | €1,000 renter refund, €0 owner allocation, €0 reserved; ledger and activity survive reload |
+| Main: apartment, €1,000 | Review terms → renter accepts → owner publishes photographed baseline → renter acknowledges → simulated funding → active rental → renter submits photographed return → compare condition → owner approves full refund | €1,000 renter refund, €0 owner allocation, €0 reserved; ledger and activity survive reload |
 | Backup: equipment, €300 | Create camera agreement → same acceptance/handover/return steps → owner proposes €25 with a reason → renter asks to revise → owner proposes €20 → renter explicitly approves | €280 renter refund, €20 owner allocation, €0 reserved; proposal revision and consent are visible |
 
-Owner creation already records the owner's acceptance of version 1. Make that consequence clear on the create action. Baseline publication records the owner's acknowledgement; activation still requires the renter's acknowledgement of that exact baseline.
+Owner creation already records the owner's acceptance of version 1. Make that consequence clear on the create action. Baseline publication records the owner's acknowledgement; the renter reviews and acknowledges that exact baseline before funding. Only full simulated funding then activates the rental.
 
 Use the full-refund branch live. Keep equipment negotiation as a rehearsed backup or show it if time allows. Creating an agreement replaces the browser's current agreement; a multi-agreement dashboard is outside this release. Use prepared sample photos and a written reset/rebuild procedure rather than building a scenario manager.
 
@@ -90,12 +90,14 @@ Already available: shared proposal/revision/approval controls. Reuse these rathe
 
 Already complete: local creation and separate authenticated setup/claim/acceptance. Full Auth integration is outside the presentation scope.
 
-- [ ] **V1 / P0 — prepare both local setups.** Apartment €1,000 and camera €300, coherent dates/location/terms, 48-hour review rule and fake parties. Make creation-as-owner-acceptance clear; renter reviews that version before funding.
-- [ ] **V2 / P0 — verify local form boundaries.** Required fields, invalid dates/amounts and owner/renter actions produce useful errors. Fix equipment labels where housing-only copy confuses the walkthrough. Fix presentation blockers only.
-- [ ] **V3 / P0 — keep the entry path clear with Hayk.** Main call to action reaches the local walkthrough. No required step leads into the separate account flow; label account-flow links as a separate preview.
+- [x] **V1 / P0 — prepare both local setups.** Apartment €1,000 and camera €300, coherent dates/location/terms, 48-hour review rule and fake parties. Make creation-as-owner-acceptance clear; renter reviews that version before funding.
+- [x] **V2 / P0 — verify local form boundaries.** Required fields, invalid dates/amounts and owner/renter actions produce useful errors. Fix equipment labels where housing-only copy confuses the walkthrough. Fix presentation blockers only.
+- [x] **V3 / P0 — keep the entry path clear with Hayk.** Main call to action reaches the local walkthrough. No required step leads into the separate account flow; label account-flow links as a separate preview.
 - [ ] **V4 / P1 — smoke-test existing Auth if configured.** Verify sign-in/invite/acceptance without expanding it. Supabase availability must not block the main demo.
 
-**Handoff:** give Aiperi setup values and acceptance wording. Coordinate shared validation with Samir. Defer revisions and invitation-management expansion.
+**Handoff:** the confirmed examples, acceptance wording and reset instructions are in [the setup reference](docs/demo/setup-values.md). Aiperi's script and Tayma's handover runbook use those same values. Coordinate shared validation with Samir. Defer revisions and invitation-management expansion.
+
+**V1–V3 implementation checkpoint:** `agreement-presets.ts` supplies the reset apartment and both form examples: apartment €1,000, 1–17 October 2026; camera €300, 16–17 October 2026; fictional locations and explicit local-demo terms. Type selection loads all matching values. Shared validation rejects missing fields, invalid/date-order errors, out-of-range amounts and fractional cents; inline errors preserve input and tenant submission is guarded even if a disabled button is bypassed. “Account setup preview” labels the separate Auth path; the local creation → tenant acceptance → landlord baseline → tenant review → funding path needs no account service. Tests cover presets, boundaries, correction/retry and local navigation. Validation on the prepared integrated snapshot: 270 unit/component tests in 24 files, TypeScript, focused lint and production build passed. Two viewport-specific setup browser journeys were added and existing negotiation journeys updated for Start dispute. Browser execution could not reach a page because Chrome aborted at launch in this environment; no desktop/mobile browser pass or final-origin rehearsal is claimed. H2/H3/H4 still own full-flow browser verification and release rehearsal. V4 remains optional and unverified.
 
 ### Hayk — integration, verification and release
 
@@ -123,7 +125,7 @@ Do not start P1 before step 3 passes. If time is tight, cut P1, the live equipme
 ## 6. Demo release checklist
 
 - [ ] Main `/` walkthrough opens at the final URL without credentials or setup surprises.
-- [ ] Accepted terms are required for funding; funding and exact-baseline acknowledgements are required for activation.
+- [ ] Tenant acceptance precedes landlord baseline publication. Tenant acknowledgement of the current baseline is required before funding; full funding activates the rental.
 - [ ] Photos/checklists and agreement state survive refresh on the presentation browser.
 - [ ] First return fixes one displayed deadline; copy does not imply an automatic refund service exists.
 - [ ] €1,000 full refund, including after a rejected split, displays €1,000/€0 with zero reserved.

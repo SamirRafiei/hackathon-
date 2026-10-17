@@ -2,7 +2,7 @@
 
 Make a pact. Keep it fair.
 
-Pact is a prototype for making rental deposits easier to understand and settle fairly. The demo starts with an apartment deposit and lets the landlord create an apartment or equipment security-deposit agreement. The tenant reviews and accepts the exact version before simulated funding. Both parties acknowledge a photographed condition baseline before activation, and a photographed return starts the 48-hour review before refund or an agreed split. The broader product plan is in [plan.md](./plan.md).
+Pact is a prototype for making rental deposits easier to understand and settle fairly. The demo starts with an apartment deposit and lets the landlord create an apartment or equipment security-deposit agreement. The tenant accepts the exact agreement version, then the landlord publishes a photographed condition baseline. The tenant reviews and acknowledges that baseline before simulated funding becomes available. Funding the full deposit activates the rental; a photographed return starts the 48-hour review before refund or an agreed split. The broader product plan is in [plan.md](./plan.md).
 
 The idea can fit inside a banking app or another trusted host experience. This standalone prototype has no banking-provider integration and does not hold, move, or protect real money.
 

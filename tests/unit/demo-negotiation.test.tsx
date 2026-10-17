@@ -43,6 +43,7 @@ describe("Aiperi's equipment negotiation rehearsal", () => {
       review.agreement.handover?.returnRecord?.inspectionDeadline;
 
     async function propose(amount: string, reason: string) {
+      await user.click(screen.getByRole("button", { name: "Start dispute" }));
       await user.clear(screen.getByLabelText("Landlord allocation"));
       await user.type(screen.getByLabelText("Landlord allocation"), amount);
       await user.clear(screen.getByLabelText("Reason"));
@@ -73,7 +74,7 @@ describe("Aiperi's equipment negotiation rehearsal", () => {
     await user.click(
       screen.getByRole("button", { name: "Switch to landlord demo identity" }),
     );
-    expect(screen.getByText("Revise proposal v1")).toBeInTheDocument();
+    expect(screen.getByText("Revision requested for v1")).toBeInTheDocument();
     await propose("20", "Revised case repair estimate after comparison.");
     expect(screen.getByText(/The tenant acts next:/)).toHaveTextContent(
       "€280.00 refund and €20.00 landlord allocation",

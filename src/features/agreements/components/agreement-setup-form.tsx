@@ -2,7 +2,12 @@
 
 import { ArrowLeft, FileText, KeyRound } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import type { DemoAgreementInput } from "@/features/demo/model";
+import {
+  parseDemoDepositAmount,
+  validateDemoAgreementInput,
+  type DemoAgreementInput,
+} from "@/features/demo/model";
+import { DEMO_AGREEMENT_PRESETS } from "@/features/demo/agreement-presets";
 
 type Props = {
   isLandlord: boolean;
@@ -15,29 +20,53 @@ export default function AgreementSetupForm({
   onCancel,
   onCreate,
 }: Props) {
-  const [assetType, setAssetType] =
-    useState<DemoAgreementInput["assetType"]>("APARTMENT");
-  const [title, setTitle] = useState("Apartment security deposit");
-  const [address, setAddress] = useState("18 Kertész utca, Budapest");
-  const [startDate, setStartDate] = useState("2026-11-01");
-  const [endDate, setEndDate] = useState("2027-08-31");
-  const [amount, setAmount] = useState("1000");
-  const [terms, setTerms] = useState(
-    "Both parties agree to the stated rental dates, condition checklist, and 48-hour return review. Any deduction requires mutual agreement.",
-  );
+  const initial = DEMO_AGREEMENT_PRESETS.APARTMENT;
+  const [assetType, setAssetType] = useState(initial.assetType);
+  const [title, setTitle] = useState(initial.title);
+  const [address, setAddress] = useState(initial.address);
+  const [startDate, setStartDate] = useState(initial.startDate);
+  const [endDate, setEndDate] = useState(initial.endDate);
+  const [amount, setAmount] = useState(String(initial.amountMinor / 100));
+  const [terms, setTerms] = useState(initial.terms);
+  const [error, setError] = useState("");
+
+  function selectExample(type: DemoAgreementInput["assetType"]) {
+    const example = DEMO_AGREEMENT_PRESETS[type];
+    setAssetType(type);
+    setTitle(example.title);
+    setAddress(example.address);
+    setStartDate(example.startDate);
+    setEndDate(example.endDate);
+    setAmount(String(example.amountMinor / 100));
+    setTerms(example.terms);
+    setError("");
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!isLandlord) return;
-    onCreate({
-      assetType,
-      title,
-      address,
-      startDate,
-      endDate,
-      amountMinor: Math.round(Number(amount) * 100),
-      terms,
-    });
+    setError("");
+    if (!isLandlord) {
+      setError("Switch to the landlord demo identity to create an agreement.");
+      return;
+    }
+    try {
+      const input = validateDemoAgreementInput({
+        assetType,
+        title,
+        address,
+        startDate,
+        endDate,
+        amountMinor: parseDemoDepositAmount(amount),
+        terms,
+      });
+      onCreate(input);
+    } catch (failure) {
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : "Check the agreement details and retry.",
+      );
+    }
   }
 
   return (
@@ -51,13 +80,18 @@ export default function AgreementSetupForm({
           <h2 id="setup-heading">Set the terms together</h2>
           <p>
             Create a simulated security-deposit agreement. The tenant reviews
-            and accepts this exact version before funding becomes available.
+            and accepts this exact version. You then publish the condition
+            baseline for tenant review before funding becomes available.
           </p>
         </div>
       </div>
 
       <div className="setup-participant">
-        <strong>Tenant for this walkthrough</strong>
+        <strong>
+          {assetType === "APARTMENT"
+            ? "Tenant for this walkthrough"
+            : "Renter for this walkthrough"}
+        </strong>
         <span>
           Luca Martin · demo identity. No invitation is sent; after creation,
           switch to Tenant to review and accept the version.
@@ -70,18 +104,27 @@ export default function AgreementSetupForm({
         </div>
       )}
 
-      <form className="setup-form" onSubmit={submit}>
+      <form className="setup-form" noValidate onSubmit={submit}>
+        {error && (
+          <div className="setup-hint" role="alert">
+            {error}
+          </div>
+        )}
         <label htmlFor="asset-type">Rental type</label>
         <select
           id="asset-type"
           onChange={(event) =>
-            setAssetType(event.target.value as DemoAgreementInput["assetType"])
+            selectExample(event.target.value as DemoAgreementInput["assetType"])
           }
           value={assetType}
         >
           <option value="APARTMENT">Apartment security deposit</option>
           <option value="EQUIPMENT">Equipment security deposit</option>
         </select>
+        <p className="setup-warning">
+          Changing rental type loads that example’s sample values. You can edit
+          them before creating the agreement.
+        </p>
 
         <label htmlFor="agreement-title">Agreement name</label>
         <input

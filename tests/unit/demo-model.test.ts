@@ -2,7 +2,10 @@
 
 import { describe, expect, it } from "vitest";
 import { demoActors } from "@/lib/auth/identity-provider";
-import { returnReviewDemoSnapshot } from "./fixtures/handover";
+import {
+  returnReviewDemoSnapshot,
+  reviewedBaselineSnapshot,
+} from "./fixtures/handover";
 import {
   DEMO_AMOUNT_MINOR,
   acceptTerms,
@@ -89,10 +92,10 @@ describe("Pact demo agreement lifecycle", () => {
     );
   });
 
-  it("moves to funding only after the tenant accepts the same terms", () => {
+  it("waits for the landlord baseline after the tenant accepts the same terms", () => {
     const snapshot = acceptedSnapshot();
 
-    expect(snapshot.agreement.status).toBe("AWAITING_FUNDING");
+    expect(snapshot.agreement.status).toBe("AWAITING_BASELINE");
     expect(snapshot.agreement.acceptedBy).toEqual({
       landlord: true,
       tenant: true,
@@ -111,13 +114,13 @@ describe("Pact demo agreement lifecycle", () => {
   });
 
   it("allows only the tenant to fund, and records a balanced reservation", () => {
-    const accepted = acceptedSnapshot();
+    const accepted = reviewedBaselineSnapshot();
     expect(() => fundAgreement(accepted, demoActors.landlord)).toThrow(
       "Switch to the tenant demo identity to do this.",
     );
 
     const funded = fundAgreement(accepted, demoActors.tenant);
-    expect(funded.agreement.status).toBe("FUNDED");
+    expect(funded.agreement.status).toBe("ACTIVE");
     expect(funded.agreement.reservedMinor).toBe(DEMO_AMOUNT_MINOR);
     expect(funded.agreement.ledger.map((entry) => entry.amountMinor)).toEqual([
       -DEMO_AMOUNT_MINOR,

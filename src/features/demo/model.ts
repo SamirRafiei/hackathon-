@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEMO_AGREEMENT_PRESETS } from "./agreement-presets";
 import type {
   BaselineRecord,
   ReturnRecord,
@@ -19,6 +20,7 @@ export const DEMO_CURRENCY = "EUR";
 
 export type AgreementStatus =
   | "AWAITING_ACCEPTANCE"
+  | "AWAITING_BASELINE"
   | "AWAITING_FUNDING"
   | "FUNDED"
   | "ACTIVE"
@@ -131,6 +133,7 @@ export const demoSnapshotSchema = z
       currency: z.literal(DEMO_CURRENCY),
       status: z.enum([
         "AWAITING_ACCEPTANCE",
+        "AWAITING_BASELINE",
         "AWAITING_FUNDING",
         "FUNDED",
         "ACTIVE",
@@ -221,7 +224,7 @@ export const demoSnapshotSchema = z
     }
 
     if (
-      status === "AWAITING_FUNDING" &&
+      ["AWAITING_BASELINE", "AWAITING_FUNDING"].includes(status) &&
       !(acceptedBy.landlord && acceptedBy.tenant)
     ) {
       context.addIssue({
@@ -310,13 +313,7 @@ export function createInitialDemoSnapshot(): DemoSnapshot {
     activeActorId: demoActors.tenant.id,
     agreement: {
       id: "demo-apartment-agreement",
-      assetType: "APARTMENT",
-      title: "Apartment security deposit",
-      address: "18 Kertész utca, Budapest",
-      terms:
-        "Both parties agree to the stated rental dates, condition checklist, and 48-hour return review. Any deduction requires mutual agreement.",
-      startDate: "2026-09-01",
-      endDate: "2027-08-31",
+      ...DEMO_AGREEMENT_PRESETS.APARTMENT,
       termsVersion: 1,
       amountMinor: DEMO_AMOUNT_MINOR,
       currency: DEMO_CURRENCY,
@@ -363,10 +360,14 @@ const agreementInputSchema = z
   .object({
     assetType: z.enum(["APARTMENT", "EQUIPMENT"]),
     title: z.string().trim().min(1, "Add a name for this agreement.").max(120),
-    address: z.string().trim().min(1, "Add the property's location.").max(240),
-    startDate: z.iso.date(),
-    endDate: z.iso.date(),
-    amountMinor: z.number().int().min(100).max(100_000_000),
+    address: z.string().trim().min(1, "Add the rental location.").max(240),
+    startDate: z.iso.date({ error: "Enter a valid rental start date." }),
+    endDate: z.iso.date({ error: "Enter a valid rental end date." }),
+    amountMinor: z
+      .number()
+      .int("Enter a deposit in whole cents.")
+      .min(100, "The deposit must be at least €1.")
+      .max(100_000_000, "The deposit cannot exceed €1,000,000."),
     terms: z.string().trim().min(10, "Add the agreement terms.").max(20000),
   })
   .refine((value) => value.endDate > value.startDate, {
@@ -374,19 +375,46 @@ const agreementInputSchema = z
     message: "The end date must be after the start date.",
   });
 
-export function createDemoAgreement(
-  actor: PactActor,
+/** Parse entered euros without rounding away fractional cents. */
+export function parseDemoDepositAmount(value: string): number {
+  const normalized = value.trim();
+  if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) {
+    throw new Error(
+      "Enter a deposit from €1 to €1,000,000 with up to two decimal places.",
+    );
+  }
+  const [whole, fraction = ""] = normalized.split(".");
+  const amountMinor = Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
+  if (
+    !Number.isSafeInteger(amountMinor) ||
+    amountMinor < 100 ||
+    amountMinor > 100_000_000
+  ) {
+    throw new Error(
+      "Enter a deposit from €1 to €1,000,000 with up to two decimal places.",
+    );
+  }
+  return amountMinor;
+}
+
+export function validateDemoAgreementInput(
   input: DemoAgreementInput,
-): DemoSnapshot {
-  requireRole(actor, "landlord");
+): DemoAgreementInput {
   const parsed = agreementInputSchema.safeParse(input);
   if (!parsed.success) {
     throw new Error(
       parsed.error.issues[0]?.message ?? "Check the agreement details.",
     );
   }
+  return parsed.data;
+}
 
-  const values = parsed.data;
+export function createDemoAgreement(
+  actor: PactActor,
+  input: DemoAgreementInput,
+): DemoSnapshot {
+  requireRole(actor, "landlord");
+  const values = validateDemoAgreementInput(input);
   const now = new Date().toISOString();
   return {
     activeActorId: actor.id as DemoSnapshot["activeActorId"],
@@ -466,7 +494,7 @@ export function acceptTerms(
     `Accepted agreement version ${agreement.termsVersion}.0`,
   );
   if (acceptedBy.landlord && acceptedBy.tenant) {
-    agreement = { ...agreement, status: "AWAITING_FUNDING" };
+    agreement = { ...agreement, status: "AWAITING_BASELINE" };
   }
   return { ...snapshot, agreement };
 }
@@ -476,9 +504,32 @@ export function fundAgreement(
   actor: PactActor,
 ): DemoSnapshot {
   requireRole(actor, "tenant");
-  if (snapshot.agreement.status !== "AWAITING_FUNDING") {
+  if (
+    !snapshot.agreement.acceptedBy.landlord ||
+    !snapshot.agreement.acceptedBy.tenant
+  ) {
     throw new Error("Both parties must accept before funding.");
   }
+  if (
+    !["AWAITING_BASELINE", "AWAITING_FUNDING"].includes(
+      snapshot.agreement.status,
+    )
+  ) {
+    throw new Error("This agreement is no longer awaiting funding.");
+  }
+  const baseline = snapshot.agreement.handover?.baseline;
+  if (
+    snapshot.agreement.status !== "AWAITING_FUNDING" ||
+    !baseline ||
+    baseline.agreementId !== snapshot.agreement.id ||
+    baseline.termsVersion !== snapshot.agreement.termsVersion ||
+    baseline.assetType !== snapshot.agreement.assetType ||
+    !baseline.acknowledgedBy[demoActors.landlord.id] ||
+    !baseline.acknowledgedBy[demoActors.tenant.id]
+  )
+    throw new Error(
+      "Review and acknowledge the current condition baseline before funding.",
+    );
   const operationId = newId("fund");
   const now = new Date().toISOString();
   const entries: LedgerEntry[] = [
@@ -501,14 +552,14 @@ export function fundAgreement(
   ];
   let agreement: DemoAgreement = {
     ...snapshot.agreement,
-    status: "FUNDED",
+    status: "ACTIVE",
     reservedMinor: snapshot.agreement.amountMinor,
     ledger: [...snapshot.agreement.ledger, ...entries],
   };
   agreement = recordActivity(
     agreement,
     actor,
-    "Simulated the deposit funding; funds are reserved in the demo ledger",
+    "Simulated the deposit funding after baseline approval; rental activated",
   );
   return { ...snapshot, agreement };
 }
@@ -519,9 +570,15 @@ export function recordBaseline(
   actor: PactActor,
   input: BaselineRecord,
 ): DemoSnapshot {
-  if (snapshot.agreement.status !== "FUNDED")
+  if (
+    !["AWAITING_BASELINE", "AWAITING_FUNDING", "FUNDED"].includes(
+      snapshot.agreement.status,
+    ) ||
+    !snapshot.agreement.acceptedBy.landlord ||
+    !snapshot.agreement.acceptedBy.tenant
+  )
     throw new Error(
-      "Baseline changes require a funded agreement awaiting activation.",
+      "Baseline changes require accepted terms and an agreement awaiting activation.",
     );
   const baseline = baselineRecordSchema.parse(input);
   const current = snapshot.agreement.handover?.baseline;
@@ -587,7 +644,13 @@ export function recordBaseline(
   );
   let agreement: DemoAgreement = {
     ...snapshot.agreement,
-    status: ready ? "ACTIVE" : "FUNDED",
+    // FUNDED is retained for saves from the earlier funding-first demo.
+    status:
+      snapshot.agreement.status === "FUNDED"
+        ? ready
+          ? "ACTIVE"
+          : "FUNDED"
+        : "AWAITING_FUNDING",
     handover: {
       ...(snapshot.agreement.handover ?? emptyHandoverState()),
       baseline,
@@ -597,7 +660,9 @@ export function recordBaseline(
     agreement,
     actor,
     ready
-      ? "Both parties acknowledged the same condition baseline; rental activated"
+      ? snapshot.agreement.status === "FUNDED"
+        ? "Both parties acknowledged the same condition baseline; rental activated"
+        : "Both parties acknowledged the same condition baseline; ready for tenant funding"
       : `Published or acknowledged condition baseline version ${baseline.version}`,
   );
   return { ...snapshot, agreement };

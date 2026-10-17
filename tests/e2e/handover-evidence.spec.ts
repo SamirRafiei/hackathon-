@@ -79,7 +79,7 @@ async function readyForBaseline(page: Page, asset: "apartment" | "camera") {
   await status(page, "AWAITING_ACCEPTANCE");
   await expect(
     page.getByText(
-      "Accept and fund this agreement before recording the handover baseline.",
+      "The tenant must accept the agreement before the landlord can publish the condition baseline.",
     ),
   ).toBeVisible();
   await page.getByRole("button", { name: /Tenant$/ }).click();
@@ -89,8 +89,10 @@ async function readyForBaseline(page: Page, asset: "apartment" | "camera") {
   await page
     .getByRole("button", { name: "Accept version 1.0", exact: true })
     .click();
-  await page.getByRole("button", { name: /Simulate funding/ }).click();
-  await status(page, "FUNDED");
+  await status(page, "AWAITING_BASELINE");
+  await expect(
+    page.getByRole("button", { name: /Simulate funding/ }),
+  ).toHaveCount(0);
   await chooseView(page, "Return declaration");
   await expect(
     page.getByText(
@@ -166,7 +168,7 @@ async function publish(
   await expect(
     panel.getByText(`Condition version ${revision ? 2 : 1} · Terms version 1`),
   ).toBeVisible();
-  await status(page, "FUNDED");
+  await status(page, "AWAITING_FUNDING");
 }
 
 async function decodedPhotos(page: Page, count: number) {
@@ -200,13 +202,16 @@ for (const asset of ["apartment", "camera"] as const) {
       expect(Object.keys(original.acknowledgedBy)).toEqual(["demo-landlord"]);
       await page.reload();
       await decodedPhotos(page, 1);
-      await status(page, "FUNDED");
+      await status(page, "AWAITING_FUNDING");
       await page.getByRole("button", { name: /Tenant$/ }).click();
       const acknowledge = page.getByRole("button", {
         name: "I acknowledge condition version 1",
       });
       await acknowledge.focus();
       await page.keyboard.press("Enter");
+      await status(page, "AWAITING_FUNDING");
+      expect((await saved(page)).agreement.reservedMinor).toBe(0);
+      await page.getByRole("button", { name: /Simulate funding/ }).click();
       await status(page, "ACTIVE");
       await expect(
         page.getByRole("button", { name: "Create a new condition version" }),
@@ -310,6 +315,8 @@ test("baseline revision requires acknowledgement of the new version", async ({
   await page
     .getByRole("button", { name: "I acknowledge condition version 2" })
     .click();
+  await status(page, "AWAITING_FUNDING");
+  await page.getByRole("button", { name: /Simulate funding/ }).click();
   await status(page, "ACTIVE");
   expect(
     required((await saved(page)).agreement.handover?.baseline).version,

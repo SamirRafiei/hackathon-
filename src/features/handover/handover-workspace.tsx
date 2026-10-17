@@ -30,7 +30,9 @@ export function HandoverWorkspace(props: HandoverWorkspaceProps) {
   const [tab, setTab] = useState("baseline");
   const { agreement, actor } = props;
   const state = agreement.handover ?? emptyHandoverState();
-  const funded = [
+  const conditionAvailable = [
+    "AWAITING_BASELINE",
+    "AWAITING_FUNDING",
     "FUNDED",
     "ACTIVE",
     "RETURN_REVIEW",
@@ -100,9 +102,10 @@ export function HandoverWorkspace(props: HandoverWorkspaceProps) {
           </button>
         ))}
       </fieldset>
-      {!funded ? (
+      {!conditionAvailable ? (
         <p className="rounded-2xl bg-muted p-4 text-sm text-muted-foreground">
-          Accept and fund this agreement before recording the handover baseline.
+          The tenant must accept the agreement before the landlord can publish
+          the condition baseline.
         </p>
       ) : (
         <>
@@ -117,7 +120,11 @@ export function HandoverWorkspace(props: HandoverWorkspaceProps) {
               record={state.baseline}
               onChange={props.onBaselineChange}
               storage={storage}
-              locked={agreement.status !== "FUNDED"}
+              locked={
+                !["AWAITING_BASELINE", "AWAITING_FUNDING", "FUNDED"].includes(
+                  agreement.status,
+                )
+              }
             />
           )}
           {tab === "return" && (
