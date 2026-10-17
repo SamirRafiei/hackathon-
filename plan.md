@@ -77,10 +77,12 @@ Already complete: domain/database foundations, funding/cancellation groundwork a
 
 Already available: shared proposal/revision/approval controls. Reuse these rather than creating a second implementation.
 
-- [ ] **A1 / P0 — rehearse equipment negotiation.** Owner proposes €25 with reason; renter asks to revise; €300 stays reserved; owner publishes €20 proposal; renter sees current version, €280 refund and €20 allocation before approving. Revised amounts require fresh approval; activity explains the sequence.
-- [ ] **A2 / P0 — make pending status and finality clear.** Show who acts next after rejection/pending approval; silence keeps funds reserved. Do not imply a formal case, real-money deduction or independent reviewer exists. Coordinate completion rendering with S1/Hayk.
+- [x] **A1 / P0 — rehearse equipment negotiation.** Owner proposes €25 with reason; renter asks to revise; €300 stays reserved; owner publishes €20 proposal; renter sees current version, €280 refund and €20 allocation before approving. Revised amounts require fresh approval; activity explains the sequence. Verified locally in Chrome at 1280px and 390px, including reload before approval and after settlement. The focused browser rehearsal starts from a valid return-review fixture; full photo-upload journeys remain H2.
+- [x] **A2 / P0 — make pending status and finality clear.** Show who acts next after rejection/pending approval; silence keeps funds reserved. Do not imply a formal case, real-money deduction or independent reviewer exists. Coordinate completion rendering with S1/Hayk. Revision/pending cards now name the next actor, reserved amount and consent requirement. Completion uses ledger totals and labels simulated finality. S1's retained proposal still needs the model/saved-state fix before release; the rendering regression is covered separately.
 - [ ] **A3 / P0 — write the five-minute script.** Cover problem, simulation boundary, accepted terms, evidence, explicit refund and ledger. Include the equipment backup and honest answers about absent backend automation/review. Rehearse with Tayma's photos and Valera's values.
 - [ ] **A4 / P1 — fix a specific negotiation usability problem found in rehearsal.** No chat, case management or reviewer dashboard.
+
+**A3 progress:** [Five-minute script, equipment backup, setup values, expected amounts/status, reset procedure and honest Q&A](docs/demo-script.md) are written. A3 remains open for the final team rehearsal with Tayma's supplied photos and Valera's confirmed values on Hayk's final origin. No final-origin rehearsal or teammate handoff is claimed. A4 remains deferred until the release candidate passes the plan's P0 checks.
 
 **Handoff:** give Hayk the final script and expected amounts/status at each step. Formal claims/reviewer implementation is deferred.
 

@@ -144,6 +144,17 @@ export default function DemoWorkspace() {
   const isLandlord = actor.role === "landlord";
   const remaining = agreement.reservedMinor;
   const proposal = agreement.proposal;
+  const revisionRequested = agreement.status === "RETURN_REVIEW" && !!proposal;
+  const settledRefund = agreement.ledger.reduce(
+    (total, entry) =>
+      total + (entry.account === "renter_refund" ? entry.amountMinor : 0),
+    0,
+  );
+  const settledAllocation = agreement.ledger.reduce(
+    (total, entry) =>
+      total + (entry.account === "landlord_allocation" ? entry.amountMinor : 0),
+    0,
+  );
 
   function commit(
     action: (current: DemoSnapshot, currentActor: PactActor) => DemoSnapshot,
@@ -557,13 +568,23 @@ export default function DemoWorkspace() {
                         <HandCoins size={17} />
                       </span>
                       <div>
-                        <strong>Suggest a fair split</strong>
+                        <strong>
+                          {revisionRequested
+                            ? `Revise proposal v${proposal.version}`
+                            : "Suggest a fair split"}
+                        </strong>
                         <span>
-                          The tenant must approve this exact proposal.
+                          {revisionRequested
+                            ? `The tenant asked to revise. You act next: propose a new version or approve a full refund. ${formatMoney(remaining)} stays reserved.`
+                            : "The tenant must approve this exact proposal."}
                         </span>
                       </div>
                     </div>
                     <form className="proposal-form" onSubmit={sendProposal}>
+                      <p className="refund-preview">
+                        Demo — simulated funds. A new version requires fresh
+                        tenant approval.
+                      </p>
                       <label htmlFor="allocation">Landlord allocation</label>
                       <div className="input-with-prefix">
                         <span>€</span>
@@ -623,8 +644,12 @@ export default function DemoWorkspace() {
                 ) : (
                   <WaitingCard
                     icon={<Clock3 size={17} />}
-                    title="Return review is open"
-                    text="The landlord can approve a full refund or suggest a split. The demo funds remain reserved."
+                    title={
+                      revisionRequested
+                        ? `Revision requested for v${proposal.version}`
+                        : "Return review is open"
+                    }
+                    text={`The landlord acts next: ${revisionRequested ? "publish a revised proposal" : "suggest a split"} or approve a full refund. ${formatMoney(remaining)} stays reserved. Silence does not settle funds; no independent reviewer is involved.`}
                   />
                 ))}
               {agreement.status === "PROPOSAL_PENDING" &&
@@ -640,8 +665,8 @@ export default function DemoWorkspace() {
                           Review split proposal · v{proposal.version}
                         </strong>
                         <span>
-                          Both parties must agree before the demo ledger
-                          settles.
+                          Demo — simulated funds. Approving this version
+                          completes the demo settlement.
                         </span>
                       </div>
                     </div>
@@ -660,6 +685,11 @@ export default function DemoWorkspace() {
                       </div>
                     </div>
                     <blockquote>{proposal.reason}</blockquote>
+                    <p className="refund-preview">
+                      {formatMoney(remaining)} stays reserved until you approve.
+                      Asking to revise or not responding does not settle funds.
+                      No independent reviewer is involved.
+                    </p>
                     <div className="proposal-actions">
                       <button
                         className="secondary-action"
@@ -689,7 +719,7 @@ export default function DemoWorkspace() {
                   <WaitingCard
                     icon={<Clock3 size={17} />}
                     title="Split proposal sent"
-                    text={`Waiting for the tenant to approve version ${proposal.version}. The funds stay reserved until both agree.`}
+                    text={`The tenant acts next: review version ${proposal.version} — ${formatMoney(proposal.renterRefundMinor)} refund and ${formatMoney(proposal.ownerAllocationMinor)} landlord allocation. ${formatMoney(remaining)} stays reserved while approval is pending. Silence does not settle funds. Demo — simulated funds; no independent reviewer is involved.`}
                   />
                 ))}
               {agreement.status === "COMPLETED" && (
@@ -700,9 +730,7 @@ export default function DemoWorkspace() {
                   <div>
                     <strong>Demo settlement complete</strong>
                     <span>
-                      {proposal
-                        ? `${formatMoney(proposal.renterRefundMinor)} to the tenant · ${formatMoney(proposal.ownerAllocationMinor)} to the landlord`
-                        : "The full deposit was returned to the tenant."}
+                      {`${formatMoney(settledRefund)} to the tenant · ${formatMoney(settledAllocation)} to the landlord · ${formatMoney(remaining)} reserved. Demo — simulated funds; no real payment was made.`}
                     </span>
                   </div>
                 </div>
@@ -732,7 +760,7 @@ export default function DemoWorkspace() {
                 {agreement.status === "PROPOSAL_PENDING"
                   ? "The agreement stays in review until both people approve the same split."
                   : agreement.status === "COMPLETED"
-                    ? "The final split is recorded in the demo ledger and activity history."
+                    ? "The final outcome is recorded in the local demo ledger and activity history. No real payment was made."
                     : "Each step is visible to both parties. A landlord allocation needs tenant approval; a full refund returns to the tenant."}
               </p>
               <div className="next-step-box">
