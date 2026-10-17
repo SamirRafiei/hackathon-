@@ -5,6 +5,11 @@ Canonical names and inputs/results are in
 **Business mutation RPCs are not implemented or granted in Stage 1.** Allocation,
 schema integrity and access policies are working implementations.
 
+**Stage 2A update:** `startContribution`, `completeSimulatedContribution` and
+`processDueContributions` are now implemented by migration 004. See
+[FUNDING.md](./FUNDING.md) for grants, payloads, failure fixtures and local test limits.
+Other operations below remain implementation contracts.
+
 ## Transaction protocol
 
 1. Verify identity in the server handler and authorize again inside the RPC using

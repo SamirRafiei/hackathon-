@@ -2,7 +2,7 @@
 
 Make a pact. Keep it fair.
 
-Pact hackathon application foundation with Stage 1 database schema, integrity checks, RLS, private evidence policies, shared domain contracts and tested contribution allocation. Product screens, authentication flows, financial mutation RPCs, and handover/dispute workflows are **not implemented yet**. See [plan.md](./plan.md) for the agreed rules, [schema v1](./supabase/SCHEMA.md) for database details and [operation contracts](./supabase/OPERATIONS.md) for the team handoff.
+Pact hackathon application with Stage 1 database foundation and [Stage 2A simulated funding](./supabase/FUNDING.md): authorized per-borrower funding, atomic ledger postings, retries, idempotency and a bounded worker. Product screens, authentication flows, cancellation/refunds and handover/dispute workflows are **not implemented yet**. See [plan.md](./plan.md) for the agreed rules, [schema v1](./supabase/SCHEMA.md) for database details and [operation contracts](./supabase/OPERATIONS.md) for the team handoff.
 
 Pact is pitched as a proposed agreement/deposit layer within the Wise ecosystem. The prototype is a standalone Next.js/Supabase app with simulated financial operations; it has no Wise integration.
 
@@ -123,7 +123,7 @@ npm run db:types
 
 For an existing hosted project, authenticate with `npx supabase login` and generate types using the project reference command above. The project ID flag is explicit; the script does not load `.env.local`. Coordinate linking, schema application, and remote writes with Sameer. Do not independently push competing migrations to the shared database.
 
-Ordered Stage 1 migrations create the application tables, integrity checks, RLS and private evidence bucket. No hosted schema has been applied, reviewer/users provisioned, cron scheduled, or financial RPCs enabled. `src/types/database.ts` remains an explicit empty-schema placeholder because official local generation is blocked by the missing Docker engine. The generator writes only after a successful CLI response; do not invent database types. See [schema setup](./supabase/SCHEMA.md) for application and verification steps.
+Ordered migrations create the Stage 1 foundation and Stage 2A funding RPCs. No hosted schema has been applied, reviewer/users provisioned, or cron scheduled. `src/types/database.ts` remains an explicit empty-schema placeholder because official local generation is blocked by the missing Docker engine. The generator writes only after a successful CLI response; do not invent database types. See [schema setup](./supabase/SCHEMA.md) and [funding integration](./supabase/FUNDING.md).
 
 ## Before feature work
 

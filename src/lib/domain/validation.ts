@@ -22,9 +22,13 @@ export const mutationInputSchema = z
     agreementId: participantIdSchema,
     expectedRevision: z
       .string()
+      .max(19)
       .regex(/^(0|[1-9][0-9]*)$/)
       .refine(
-        (value) => BigInt(value) <= BigInt("9223372036854775807"),
+        (value) =>
+          value.length <= 19 &&
+          /^(0|[1-9][0-9]*)$/.test(value) &&
+          BigInt(value) <= BigInt("9223372036854775807"),
         "Revision exceeds PostgreSQL bigint",
       ),
     idempotencyKey: z.string().min(1).max(200),

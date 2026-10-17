@@ -66,9 +66,12 @@ capped deduction allocator and settlement engine belong to Stage 2.
 
 ## Integration status
 
-**No `DomainOperations` mutation is deployed in Stage 1.** The types are contracts
-for implementation, not fake RPC functions. Do not implement adapters as a series
-of direct Supabase writes or relax table grants to bypass this boundary.
+**Stage 2A implements funding start/completion and the due-payment worker.** Import
+`SimulatedDepositProvider` from `@/lib/domain/server/simulated-deposit-provider` in
+server code; it is intentionally excluded from the browser-safe barrel. See
+[funding integration](../../../supabase/FUNDING.md). Other operation types remain
+contracts. Do not implement adapters as separate direct Supabase writes or relax
+table grants to bypass the transaction boundary.
 
 ```ts
 import type { DomainHandler, OperationInput } from "@/lib/domain";

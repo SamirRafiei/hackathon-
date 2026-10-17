@@ -11,6 +11,10 @@ import {
   it,
 } from "vitest";
 import { allocateContributions } from "../../src/lib/domain/allocation";
+import type {
+  OperationResult,
+  OperationOutput,
+} from "../../src/lib/domain/contracts";
 
 const uid = (n: number) =>
   `00000000-0000-0000-0000-${n.toString(16).padStart(12, "0")}`;
@@ -35,6 +39,60 @@ const operation = uid(701),
   transaction = uid(901),
   settlement = uid(1001);
 let db: PGlite;
+
+type FundingResult = OperationResult<
+  OperationOutput<"startContribution"> &
+    OperationOutput<"completeSimulatedContribution"> &
+    OperationOutput<"processDueContributions">
+>;
+async function fundingCall(
+  name: string,
+  input: object,
+): Promise<FundingResult> {
+  const result = await db.query<{ result: FundingResult }>(
+    `select public.${name}($1::jsonb) as result`,
+    [JSON.stringify(input)],
+  );
+  return result.rows[0].result;
+}
+function successful(result: FundingResult) {
+  if (!result.ok) throw new Error(result.error.code);
+  return result.data;
+}
+async function readyFunding() {
+  await db.exec(`reset role;
+    insert into public.acceptances(agreement_id,version_id,actor_id) values
+      ('${agreement}','${version}','${owner}'),('${agreement}','${version}','${borrower}'),('${agreement}','${version}','${secondBorrower}');
+    update public.agreements set state='awaiting_funding' where id='${agreement}'`);
+}
+async function startFunding(
+  actor = borrower,
+  contributionId = contribution,
+  key = "start-1",
+) {
+  await db.exec("reset role");
+  const revision = (
+    await db.query<{ revision: string }>(
+      `select revision::text from public.agreements where id='${agreement}'`,
+    )
+  ).rows[0].revision;
+  await asUser(actor);
+  return fundingCall("start_contribution", {
+    agreementId: agreement,
+    versionId: version,
+    contributionId,
+    expectedRevision: revision,
+    idempotencyKey: key,
+  });
+}
+async function completeFunding(attemptId: string, key = "complete-1") {
+  await db.exec("reset role; set local role service_role");
+  return fundingCall("complete_simulated_contribution", {
+    attemptId,
+    idempotencyKey: key,
+  });
+}
+const waitForDue = () => new Promise((resolve) => setTimeout(resolve, 2100));
 
 // Only Supabase-owned infrastructure is stubbed. All PACT DDL/functions/policies
 // below are the actual migrations executed by a real embedded PostgreSQL engine.
@@ -535,5 +593,406 @@ describe("database integrity", () => {
       values ('${agreement}','${borrower}','status','status:1','Repeated')`,
       "duplicate key",
     );
+  });
+});
+
+describe("Stage 2A simulated funding", () => {
+  it("cancels a processing attempt if its accepted version is superseded", async () => {
+    await readyFunding();
+    const started = successful(await startFunding());
+    await db.exec(`reset role;
+      insert into public.agreement_versions(id,agreement_id,owner_id,version_number,currency,deposit_minor,item_name,item_description,terms,condition_requirements,starts_at,due_at)
+        select '${uid(202)}',agreement_id,owner_id,2,currency,deposit_minor,item_name,item_description,terms,condition_requirements,starts_at,due_at
+        from public.agreement_versions where id='${version}';
+      insert into public.version_participants(agreement_id,version_id,participant_id,email,share_bps,allocated_minor)
+        select agreement_id,'${uid(202)}',participant_id,email,share_bps,allocated_minor from public.version_participants where version_id='${version}';
+      update public.agreements set current_version_id='${uid(202)}',state='awaiting_acceptance' where id='${agreement}';`);
+    expect(
+      successful(await completeFunding(started.attemptId)).attemptState,
+    ).toBe("cancelled");
+    await db.exec("reset role; set constraints all immediate");
+    expect(await count("ledger_entries")).toBe(0);
+  });
+  it("records worker failures while rolling back all batch financial changes", async () => {
+    await readyFunding();
+    successful(await startFunding());
+    await waitForDue();
+    await db.exec(`reset role;
+      create function pg_temp.fail_batch_audit() returns trigger language plpgsql as $$ begin
+        if new.action='contribution_succeeded' then raise exception 'private_failure'; end if; return new; end $$;
+      create trigger test_batch_audit before insert on public.audit_events for each row execute function pg_temp.fail_batch_audit();
+      set local role service_role;`);
+    expect(
+      await fundingCall("process_due_contributions", {
+        batchSize: 10,
+        idempotencyKey: "failed-batch",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "temporarily_unavailable" } });
+    await db.exec("reset role");
+    expect(await count("ledger_entries")).toBe(0);
+    expect(
+      (await db.query("select status,error_code from public.job_runs")).rows,
+    ).toEqual([{ status: "failed", error_code: "payment_worker_failed" }]);
+    await db.exec(
+      "drop trigger test_batch_audit on public.audit_events; set local role service_role",
+    );
+    expect(
+      successful(
+        await fundingCall("process_due_contributions", {
+          batchSize: 10,
+          idempotencyKey: "recovered-batch",
+        }),
+      ).processedCount,
+    ).toBe(1);
+  });
+  it.each([owner, stranger, reviewer, secondBorrower])(
+    "rejects funding another borrower's share: %s",
+    async (actor) => {
+      await readyFunding();
+      expect(await startFunding(actor)).toMatchObject({
+        ok: false,
+        error: { code: "not_authorized" },
+      });
+      await db.exec("reset role");
+      expect(await count("payment_attempts")).toBe(0);
+    },
+  );
+  it("requires owner and every borrower to accept, even when state claims funding is ready", async () => {
+    await db.exec(
+      `update public.agreements set state='awaiting_funding' where id='${agreement}'`,
+    );
+    expect(await startFunding()).toMatchObject({
+      ok: false,
+      error: { code: "acceptances_required" },
+    });
+    await db.exec(`reset role; insert into public.acceptances(agreement_id,version_id,actor_id) values
+      ('${agreement}','${version}','${owner}'),('${agreement}','${version}','${borrower}')`);
+    expect(await startFunding()).toMatchObject({
+      ok: false,
+      error: { code: "acceptances_required" },
+    });
+  });
+  it("rejects unclaimed, changed, or unverified snapshot membership", async () => {
+    await readyFunding();
+    await db.exec(
+      `update auth.users set email_confirmed_at=null where id='${secondBorrower}'`,
+    );
+    expect(await startFunding()).toMatchObject({
+      ok: false,
+      error: { code: "acceptances_required" },
+    });
+  });
+  it("validates RPC inputs and rejects stale versions/revisions and forbidden outcomes", async () => {
+    await readyFunding();
+    await asUser(borrower);
+    const input = {
+      agreementId: agreement,
+      versionId: version,
+      contributionId: contribution,
+      expectedRevision: "2",
+      idempotencyKey: "v",
+    };
+    for (const change of [
+      { expectedRevision: "-1" },
+      { expectedRevision: "999999999999999999999" },
+      { outcome: "succeeded" },
+      { contributionId: "invalid" },
+      { idempotencyKey: "" },
+    ]) {
+      expect(
+        await fundingCall("start_contribution", { ...input, ...change }),
+      ).toMatchObject({ ok: false, error: { code: "validation_failed" } });
+    }
+    expect(
+      await fundingCall("start_contribution", {
+        ...input,
+        expectedRevision: "0",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "stale_revision" } });
+    expect(
+      await fundingCall("start_contribution", {
+        ...input,
+        versionId: uid(999),
+      }),
+    ).toMatchObject({ ok: false, error: { code: "stale_version" } });
+  });
+  it("persists processing without posting funds and forbids early/client completion", async () => {
+    await readyFunding();
+    const started = successful(await startFunding());
+    expect(started.agreement.state).toBe("awaiting_funding");
+    expect(await count("ledger_entries")).toBe(0);
+    await rejected(
+      `select public.complete_simulated_contribution('{"attemptId":"${started.attemptId}","idempotencyKey":"x"}')`,
+      "permission denied",
+    );
+    await rejected(
+      `select public.process_due_contributions('{"batchSize":1,"idempotencyKey":"x"}')`,
+      "permission denied",
+    );
+    expect(await completeFunding(started.attemptId)).toMatchObject({
+      ok: false,
+      error: { code: "temporarily_unavailable", retryable: true },
+    });
+    await db.exec("reset role");
+    expect(
+      (
+        await db.query(
+          `select state,secured_minor from public.contributions where id='${contribution}'`,
+        )
+      ).rows,
+    ).toEqual([{ state: "processing", secured_minor: 0 }]);
+    expect(await count("operation_requests")).toBe(1);
+  });
+  it("replays the original start result before stale-revision checks and rejects changed payloads", async () => {
+    await readyFunding();
+    await asUser(borrower);
+    const input = {
+      agreementId: agreement,
+      versionId: version,
+      contributionId: contribution,
+      expectedRevision: "2",
+      idempotencyKey: "same",
+    };
+    const first = await fundingCall("start_contribution", input);
+    const duplicate = await fundingCall("start_contribution", input);
+    expect(duplicate).toEqual({ ...first, replayed: true });
+    expect(
+      await fundingCall("start_contribution", {
+        ...input,
+        expectedRevision: "3",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "idempotency_conflict" } });
+    expect(await startFunding(borrower, contribution, "new-key")).toMatchObject(
+      { ok: false, error: { code: "invalid_state" } },
+    );
+    await db.exec("reset role");
+    expect(await count("payment_attempts")).toBe(1);
+  });
+  it("funds both borrowers separately, balances the ledger, freezes terms and gates handover", async () => {
+    await readyFunding();
+    const first = successful(await startFunding());
+    const second = successful(
+      await startFunding(secondBorrower, secondContribution, "start-2"),
+    );
+    await waitForDue();
+    const one = successful(await completeFunding(first.attemptId));
+    expect(one.attemptState).toBe("succeeded");
+    expect(one.agreement.state).toBe("awaiting_funding");
+    const two = successful(
+      await completeFunding(second.attemptId, "complete-2"),
+    );
+    expect(two.agreement.state).toBe("ready_for_handover");
+    await db.exec("reset role; set constraints all immediate");
+    expect(
+      (
+        await db.query(
+          "select sum(amount_minor)::integer as balance from public.ledger_entries",
+        )
+      ).rows,
+    ).toEqual([{ balance: 0 }]);
+    expect(
+      (
+        await db.query(
+          "select sum(secured_minor)::integer as secured from public.contributions",
+        )
+      ).rows,
+    ).toEqual([{ secured: 25000 }]);
+    expect(await count("ledger_transactions")).toBe(2);
+    expect(await count("ledger_entries")).toBe(4);
+    await rejected(
+      `update public.participants set share_bps=5000 where id='${participant}'`,
+      "membership_frozen",
+    );
+  });
+  it("persists a deterministic decline and permits a new-key retry with one successful posting", async () => {
+    await readyFunding();
+    await db.exec(
+      `insert into pact_private.simulated_failure_fixtures values ('${contribution}',1)`,
+    );
+    const failed = successful(await startFunding());
+    await waitForDue();
+    expect(
+      successful(await completeFunding(failed.attemptId)).attemptState,
+    ).toBe("failed");
+    await db.exec("reset role");
+    expect(await count("ledger_entries")).toBe(0);
+    const retry = successful(
+      await startFunding(borrower, contribution, "retry-1"),
+    );
+    expect(retry.attemptId).not.toBe(failed.attemptId);
+    await waitForDue();
+    expect(
+      successful(await completeFunding(retry.attemptId, "complete-retry"))
+        .attemptState,
+    ).toBe("succeeded");
+    await db.exec("reset role; set constraints all immediate");
+    expect(await count("payment_attempts")).toBe(2);
+    expect(await count("ledger_transactions")).toBe(1);
+    expect(
+      (
+        await db.query<{ state: string }>(
+          "select state from public.payment_attempts order by created_at,id",
+        )
+      ).rows
+        .map((row) => row.state)
+        .sort(),
+    ).toEqual(["failed", "succeeded"]);
+  }, 10000);
+  it("duplicate completions with same/different keys never post twice", async () => {
+    await readyFunding();
+    const started = successful(await startFunding());
+    await waitForDue();
+    const first = await completeFunding(started.attemptId);
+    expect(await completeFunding(started.attemptId)).toEqual({
+      ...first,
+      replayed: true,
+    });
+    expect(await completeFunding(started.attemptId, "different")).toMatchObject(
+      { ok: false, error: { code: "already_processed" } },
+    );
+    await db.exec("reset role; set constraints all immediate");
+    expect(await count("ledger_transactions")).toBe(1);
+    expect(await count("ledger_entries")).toBe(2);
+  });
+  it("rejects a completion key reused for another attempt", async () => {
+    await readyFunding();
+    const first = successful(await startFunding());
+    const second = successful(
+      await startFunding(secondBorrower, secondContribution, "second"),
+    );
+    await waitForDue();
+    successful(await completeFunding(first.attemptId));
+    expect(await completeFunding(second.attemptId)).toMatchObject({
+      ok: false,
+      error: { code: "idempotency_conflict" },
+    });
+  });
+  it("handles duplicate requests submitted together (serialized by the embedded connection)", async () => {
+    await readyFunding();
+    await asUser(borrower);
+    const input = {
+      agreementId: agreement,
+      versionId: version,
+      contributionId: contribution,
+      expectedRevision: "2",
+      idempotencyKey: "parallel",
+    };
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () => fundingCall("start_contribution", input)),
+    );
+    expect(results.every((result) => result.ok)).toBe(true);
+    expect(
+      results.filter((result) => result.ok && !result.replayed),
+    ).toHaveLength(1);
+    await db.exec("reset role");
+    expect(await count("payment_attempts")).toBe(1);
+  });
+  it("cancellation-first ordering reconciles the attempt without securing money", async () => {
+    await readyFunding();
+    const started = successful(await startFunding());
+    await db.exec(
+      `reset role; update public.agreements set state='cancelling' where id='${agreement}'`,
+    );
+    expect(
+      successful(await completeFunding(started.attemptId)).attemptState,
+    ).toBe("cancelled");
+    expect(
+      await startFunding(borrower, contribution, "retry-after-cancel"),
+    ).toMatchObject({ ok: false, error: { code: "invalid_state" } });
+    await db.exec("reset role");
+    expect(await count("ledger_entries")).toBe(0);
+    expect(
+      (
+        await db.query(
+          `select secured_minor from public.contributions where id='${contribution}'`,
+        )
+      ).rows,
+    ).toEqual([{ secured_minor: 0 }]);
+  });
+  it("completion-first ordering preserves funds for the future cancellation/refund transaction", async () => {
+    await readyFunding();
+    const started = successful(await startFunding());
+    await waitForDue();
+    successful(await completeFunding(started.attemptId));
+    await db.exec(
+      `reset role; update public.agreements set state='cancelling' where id='${agreement}'`,
+    );
+    expect(
+      await completeFunding(started.attemptId, "late-completion"),
+    ).toMatchObject({ ok: false, error: { code: "already_processed" } });
+    await db.exec("reset role; set constraints all immediate");
+    expect(
+      (
+        await db.query(
+          `select secured_minor from public.contributions where id='${contribution}'`,
+        )
+      ).rows,
+    ).toEqual([{ secured_minor: 15000 }]);
+    expect(await count("ledger_transactions")).toBe(1);
+  });
+  it("rolls back postings, aggregates and attempt completion if an audit write fails", async () => {
+    await readyFunding();
+    const started = successful(await startFunding());
+    await waitForDue();
+    await db.exec(`reset role;
+      create function pg_temp.fail_funding_audit() returns trigger language plpgsql as $$ begin
+        if new.action='contribution_succeeded' then raise exception 'injected_audit_failure'; end if; return new; end $$;
+      create trigger test_fail_audit before insert on public.audit_events for each row execute function pg_temp.fail_funding_audit();
+      set local role service_role;`);
+    await rejected(
+      `select public.complete_simulated_contribution('{"attemptId":"${started.attemptId}","idempotencyKey":"atomic"}')`,
+      "injected_audit_failure",
+    );
+    await db.exec("reset role");
+    expect(await count("ledger_entries")).toBe(0);
+    expect(await count("operation_requests")).toBe(1);
+    expect(
+      (
+        await db.query(
+          `select state from public.payment_attempts where id='${started.attemptId}'`,
+        )
+      ).rows,
+    ).toEqual([{ state: "processing" }]);
+    expect(
+      (
+        await db.query(
+          `select secured_minor from public.contributions where id='${contribution}'`,
+        )
+      ).rows,
+    ).toEqual([{ secured_minor: 0 }]);
+  });
+  it("processes bounded due batches without a browser and replays batch results", async () => {
+    await readyFunding();
+    successful(await startFunding());
+    successful(
+      await startFunding(secondBorrower, secondContribution, "worker-second"),
+    );
+    await waitForDue();
+    await db.exec("reset role; set local role service_role");
+    const first = await fundingCall("process_due_contributions", {
+      batchSize: 1,
+      idempotencyKey: "batch-1",
+    });
+    expect(successful(first)).toMatchObject({
+      processedCount: 1,
+      hasMore: true,
+    });
+    expect(
+      await fundingCall("process_due_contributions", {
+        batchSize: 1,
+        idempotencyKey: "batch-1",
+      }),
+    ).toEqual({ ...first, replayed: true });
+    expect(
+      successful(
+        await fundingCall("process_due_contributions", {
+          batchSize: 1,
+          idempotencyKey: "batch-2",
+        }),
+      ),
+    ).toMatchObject({ processedCount: 1, hasMore: false });
+    await db.exec("reset role; set constraints all immediate");
+    expect(await count("job_runs")).toBe(2);
+    expect(await count("ledger_transactions")).toBe(2);
   });
 });

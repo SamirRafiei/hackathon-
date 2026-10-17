@@ -70,9 +70,9 @@ export interface EvidenceInput {
 }
 type Operation<I, O> = { input: I; output: O };
 
-/** Contract map only. These names are NOT deployed RPCs or client write permissions.
+/** Domain contract map. See supabase/FUNDING.md for the implemented funding RPCs.
  * Implementers obtain identity from verified auth, not input. Every authoritative
- * transition will call ONE authorized database transaction in the next milestone.
+ * transition must call ONE authorized database transaction.
  */
 export interface DomainOperations {
   createAgreement: Operation<
@@ -109,7 +109,10 @@ export interface DomainOperations {
   >;
   completeSimulatedContribution: Operation<
     { attemptId: UUID; idempotencyKey: string },
-    TransitionResult
+    TransitionResult & {
+      attemptId: UUID;
+      attemptState: "succeeded" | "failed" | "cancelled";
+    }
   >;
   cancelAgreement: Operation<MutationInput, TransitionResult>;
   prepareCollection: Operation<
