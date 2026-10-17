@@ -2,9 +2,9 @@
 
 Make a pact. Keep it fair.
 
-Team starter for the Pact hackathon. This repository contains the application foundation and development tools. Product features, authentication flows, database tables, policies, payments, and handover/dispute workflows are **not implemented yet**. See [plan.md](./plan.md) for the agreed product rules and delivery checklist.
+Pact is a prototype for making rental deposits easier to understand and settle fairly. The current demo follows one apartment deposit from shared terms through simulated funding, return review, and an agreed split. The broader product plan is in [plan.md](./plan.md).
 
-Pact is pitched as a proposed agreement/deposit layer within the Wise ecosystem. The prototype is a standalone Next.js/Supabase app with simulated financial operations; it has no Wise integration.
+The idea can fit inside a banking app or another trusted host experience. This standalone prototype has no banking-provider integration and does not hold, move, or protect real money.
 
 ## Start locally
 
@@ -14,64 +14,43 @@ Use Node.js 22.12+ on the 22.x line, or a supported even-numbered LTS release (2
 npm ci
 ```
 
-Copy `.env.example` to `.env.local`:
-
-```powershell
-# Windows PowerShell
-Copy-Item .env.example .env.local
-```
-
-```sh
-# macOS / Linux
-cp .env.example .env.local
-```
-
 ```sh
 npm run dev
 ```
 
-Open http://localhost:3000. The static starter page works without Supabase credentials. There is no database connection or session refresh on that page.
+Open http://localhost:3000. The demo works without Docker, Supabase credentials, or an account. Use the landlord/tenant switcher to walk through the same seeded agreement. Demo choices and activity are saved in that browser's local storage, so two different browsers do not share data.
 
-For backend work, fill in `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` using the team's project or a local Supabase instance, then restart the dev server. These are public connection values; privileged secret/service-role keys must never use the `NEXT_PUBLIC_` prefix. Never commit `.env.local`.
+This identity switch is a demo control, not sign-in or proof of identity. Anyone can switch between the fake parties. Do not use real personal information or money. Future host-app integration must verify a signed identity assertion on the server; a browser-provided name, role, or biometric claim is not sufficient. The Supabase factories remain unused by this demo; the migration is not applied, and authenticated server-side financial operations are still needed.
 
-## Team workspaces
-
-| Person | Team member    | Main folders                                                                            |
-| ------ | -------------- | --------------------------------------------------------------------------------------- |
-| 1      | Sameer         | `supabase/`, `src/lib/domain/`, `src/types/database.ts`                                 |
-| 2      | Valera Murzin  | `src/features/agreements/`, `src/lib/auth/`, auth/invitation routes                     |
-| 3      | Hayk           | `src/features/deposits/`, `src/components/ui/`, dashboard/activity routes, shared shell |
-| 4      | Tayma AlDabbas | `src/features/handover/`, handover/return routes                                        |
-| 5      | Aiperi         | `src/features/disputes/`, dispute/reviewer routes, E2E scenarios                        |
-
-Sameer coordinates schema changes and shared operation contracts. Hayk coordinates shared UI and global styles. Route directories are intentionally empty until their owners implement them; they are not working screens. Do not create placeholder business logic or invented database types to work around a missing contract.
+## Project structure
 
 ```text
 src/
   app/                 App Router entry, global styles, reserved route folders
   components/ui/       Shared accessible UI components
   features/
-    agreements/        Creation, revisions, invitations, acceptance
-    deposits/          Contributions, simulated provider, history
+    demo/               Seeded agreement, local demo repository, interactive workflow
+    agreements/        Future creation, revisions, invitations, acceptance
+    deposits/          Future provider, persistent funding, transaction history
     handover/          Condition evidence, QR/code, collection, return
     disputes/          Claims, negotiation, reviewer workspace
   lib/
-    auth/              Future server identity and membership checks
+    auth/              Identity-provider boundary; current fake demo identities
     domain/            Future shared schemas and operation contracts
     supabase/          Browser and server client factories
     env.ts             Lazy public Supabase environment validation
     utils.ts           Tailwind-aware class name helper
-  types/database.ts    Explicit empty-schema placeholder; generate after migrations
-supabase/              Local configuration, future migrations and seed data
+  types/database.ts    Empty generated-schema placeholder
+supabase/              Local configuration and initial schema migration
 scripts/               Database type-generation utility
 tests/unit/            Future focused domain/component tests
 tests/e2e/             Future Playwright transaction journeys
 public/                Static assets
 ```
 
-Use `@/` for imports from `src/`. Keep components as Server Components unless they need browser state/events. Import browser/server Supabase clients explicitly from their respective modules. Server Actions and Route Handlers must each authorize their own operations.
+The demo domain transitions are kept separate from the UI and persisted through a `PactRepository` interface. `LocalDemoRepository` is only for the browser demo; a future Supabase repository should enforce every mutation and read access on the server/database.
 
-**Auth setup still required:** Valera must implement Supabase's documented Next.js Proxy/session refresh and verified server identity checks before enabling authenticated routes. The included factories are connection plumbing, not a completed authentication system. No route guards or service-role client are provided.
+**Identity boundary:** `IdentityProvider` is an integration seam, not authentication by itself. The demo provider returns fake actors. A real provider must validate the host's signed, short-lived assertion server-side and resolve the resulting identity to agreement membership. Never accept a client-selected role for real agreements.
 
 ## Installed toolkit
 
@@ -85,7 +64,7 @@ Use `@/` for imports from `src/`. Keep components as Server Components unless th
 | Dates      | `date-fns`                                                                                               |
 | Quality    | Biome linting, Prettier with Tailwind ordering, Vitest, Testing Library, jsdom, Playwright               |
 
-Only Next.js, the stylesheet, and startup page run initially. Load scanner/QR and other browser-heavy packages in the feature that needs them; they are not imported into the initial page. No external font request is needed to build. Development and production builds explicitly use Webpack to avoid a Turbopack CSS worker failure observed on this Windows setup.
+The interactive demo uses the Next.js App Router, React client state, Zod to validate saved demo data, and browser local storage. Load scanner/QR and other browser-heavy packages only in features that need them. No external font request is needed. Development and production builds explicitly use Webpack for this Windows setup.
 
 ## Commands
 
@@ -101,7 +80,7 @@ Only Next.js, the stylesheet, and startup page run initially. Load scanner/QR an
 | `npm run check`                                | Lint, types, formatting, unit tests, production build |
 | `npm run db:start` / `npm run db:stop`         | Start / stop local Supabase (requires Docker)         |
 | `npm run db:status`                            | Show local Supabase connection details                |
-| `npm run db:migration:new -- name`             | Create an empty migration for Sameer's schema work    |
+| `npm run db:migration:new -- name`             | Create a new database migration                      |
 | `npm run db:types`                             | Generate types from running local Supabase            |
 | `npm run db:types -- --project-id PROJECT_REF` | Generate types from an authorized hosted project      |
 
@@ -115,22 +94,20 @@ Vitest and Playwright are configured, but **no product tests exist yet**. Vitest
 # Local database development (Docker running)
 npm run db:start
 npm run db:status
-npm run db:migration:new -- initial_schema
-# Sameer implements and applies the schema before generating types.
 npm run db:types
 ```
 
-For an existing hosted project, authenticate with `npx supabase login` and generate types using the project reference command above. The project ID flag is explicit; the script does not load `.env.local`. Coordinate linking, schema application, and remote writes with Sameer. Do not independently push competing migrations to the shared database.
+For an existing hosted project, authenticate with `npx supabase login` and generate types using the project reference command above. The project ID flag is explicit; the script does not load `.env.local`. Review and apply migrations only to a project you are authorized to change.
 
-No app tables, migrations, RLS policies, storage buckets, reviewer grants, cron jobs, or seed users have been created by this starter. `src/types/database.ts` deliberately declares an empty schema until the real database exists. The generator writes that file only after a successful CLI response.
+The first migration defines participant-readable agreement, version, acceptance, dispute, proposal, ledger, and audit tables. It has not been applied, and browser writes are intentionally denied until authenticated transactional operations exist. There are no storage buckets, reviewer grants, cron jobs, or real seed users. `src/types/database.ts` remains an empty placeholder until the migration is applied and types are generated. The current agreement is a local fixture and is not shared between browsers. Use Docker only if you choose to run the local Supabase stack.
 
-## Before feature work
+## Next implementation steps
 
-1. Each teammate creates their assigned feature branch from the same scaffold commit (see `plan.md`).
-2. Sameer publishes the shared schema, permissions, money representation, lifecycle, and operation contracts.
-3. Valera completes auth/session refresh; Hayk supplies the common UI primitives.
-4. Each workstream builds against those contracts, with database changes coordinated through Sameer.
-5. Run `npm run check` before handing off a branch. Do not commit generated builds, local credentials, or screenshots containing secrets.
+1. Keep the current demo provider and local repository restricted to fake data.
+2. Implement a host-identity verifier and authorized server operations before using real accounts.
+3. Apply the initial migration locally, then generate database types and add transaction functions.
+4. Add focused access-control and ledger tests before connecting a persistent repository.
+5. Do not commit local credentials or screenshots containing secrets.
 
 Vercel can use its standard Next.js preset and the repository root. Add the public environment values when backend features are enabled. Deployment, Supabase provisioning, and GitHub branch creation are not performed by this scaffold.
 
