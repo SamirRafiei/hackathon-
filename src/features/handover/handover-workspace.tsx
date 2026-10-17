@@ -27,8 +27,21 @@ export type HandoverWorkspaceProps = {
 
 export function HandoverWorkspace(props: HandoverWorkspaceProps) {
   const storage = useMemo(() => new BrowserDemoEvidenceStorage(), []);
-  const [tab, setTab] = useState("baseline");
   const { agreement, actor } = props;
+  const afterFunding = [
+    "ACTIVE",
+    "RETURN_REVIEW",
+    "PROPOSAL_PENDING",
+    "COMPLETED",
+  ].includes(agreement.status);
+  const defaultTab =
+    actor.role === "tenant" && afterFunding ? "return" : "baseline";
+  const viewContext = `${agreement.id}/${actor.id}/${afterFunding}`;
+  const [selection, setSelection] = useState({
+    context: viewContext,
+    tab: defaultTab,
+  });
+  const tab = selection.context === viewContext ? selection.tab : defaultTab;
   const state = agreement.handover ?? emptyHandoverState();
   const conditionAvailable = [
     "AWAITING_BASELINE",
@@ -95,7 +108,7 @@ export function HandoverWorkspace(props: HandoverWorkspaceProps) {
             type="button"
             key={id}
             aria-pressed={tab === id}
-            onClick={() => setTab(id)}
+            onClick={() => setSelection({ context: viewContext, tab: id })}
             className={`rounded-full border px-4 py-2 text-sm font-semibold ${tab === id ? "border-foreground bg-primary text-primary-foreground" : "border-border bg-white text-foreground"}`}
           >
             {label}
@@ -133,7 +146,18 @@ export function HandoverWorkspace(props: HandoverWorkspaceProps) {
                         "Small existing wall mark beside the sofa.",
                       ],
                     }
-                  : undefined
+                  : {
+                      identifier:
+                        "Camera DEMO-CAM-001; battery, charger and case",
+                      notes:
+                        "Working camera with a small existing scuff on the case. Battery, charger and case included.",
+                      checklistNotes: [
+                        "Camera DEMO-CAM-001 identified.",
+                        "Battery, charger and case included.",
+                        "Camera powers on; lens and controls checked.",
+                        "Small existing scuff on the case documented.",
+                      ],
+                    }
               }
               locked={
                 !["AWAITING_BASELINE", "AWAITING_FUNDING", "FUNDED"].includes(
@@ -152,6 +176,13 @@ export function HandoverWorkspace(props: HandoverWorkspaceProps) {
               record={state.returnRecord}
               storage={storage}
               active={agreement.status === "ACTIVE"}
+              demoPreset={{
+                location: agreement.address,
+                notes:
+                  agreement.assetType === "APARTMENT"
+                    ? "Both keys and the listed furniture returned. Review the return photos against the accepted initial condition record."
+                    : "Camera and listed accessories returned. Review the return photos against the accepted initial condition record.",
+              }}
               onSubmitReturn={props.onSubmitReturn}
             />
           )}

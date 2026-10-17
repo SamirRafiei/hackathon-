@@ -27,6 +27,7 @@ export type ReturnPanelProps = {
   record: ReturnRecord | null;
   storage: EvidenceStorage;
   active: boolean;
+  demoPreset?: { location: string; notes: string };
   onSubmitReturn: (record: ReturnRecord) => void;
 };
 
@@ -159,13 +160,15 @@ export function ReturnPanel(props: ReturnPanelProps) {
 }
 
 function ReturnForm(props: ReturnPanelProps & { baseline: BaselineRecord }) {
-  const [location, setLocation] = useState("");
-  const [notes, setNotes] = useState("");
+  const preset =
+    props.storage.mode === "browser-demo" ? props.demoPreset : undefined;
+  const [location, setLocation] = useState(preset?.location ?? "");
+  const [notes, setNotes] = useState(preset?.notes ?? "");
   const [checklist, setChecklist] = useState(() =>
     props.baseline.checklist.map((item) => ({
       ...item,
-      checked: false,
-      note: "",
+      checked: !!preset,
+      note: preset ? item.note : "",
     })),
   );
   const [files, setFiles] = useState<EvidenceFile[]>([]);
@@ -263,6 +266,12 @@ function ReturnForm(props: ReturnPanelProps & { baseline: BaselineRecord }) {
           deposit.
         </p>
       </div>
+      {preset && (
+        <p className="rounded-xl bg-stone-50 p-3 text-sm text-stone-600">
+          Demo values are prefilled. Review the checklist, edit any changes, and
+          add return photos before submitting.
+        </p>
+      )}
       <form className="space-y-5" onSubmit={submit}>
         <fieldset disabled={disabled} className="space-y-5 disabled:opacity-60">
           <label className="block text-sm font-medium text-stone-800">

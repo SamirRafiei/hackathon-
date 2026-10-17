@@ -133,3 +133,5 @@ Vercel can use its standard Next.js preset and the repository root. Add the publ
 - [Next.js installation](https://nextjs.org/docs/app/getting-started/installation)
 - [Supabase Next.js SSR setup](https://supabase.com/docs/guides/auth/server-side/creating-a-client?framework=nextjs)
 - [Supabase local development](https://supabase.com/docs/guides/local-development)
+
+For the local demo, initial-condition and return declarations have editable presets for apartment and camera rentals. After funding, the tenant automatically lands on **Return declaration**, including after reload. Opening the draft does not submit it or start the 48-hour review; review the checklist and attach photos before submitting.

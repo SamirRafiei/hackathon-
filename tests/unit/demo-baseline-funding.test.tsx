@@ -47,5 +47,43 @@ describe("tenant condition review before funding", () => {
     expect(
       screen.queryByRole("button", { name: /Simulate funding/ }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Return declaration" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("Return location")).toHaveValue(
+      initial.agreement.address,
+    );
+    expect(
+      (screen.getByLabelText("Return condition notes") as HTMLTextAreaElement)
+        .value,
+    ).toContain("Both keys");
+    expect(
+      screen
+        .getAllByRole("checkbox")
+        .every((checkbox) => (checkbox as HTMLInputElement).checked),
+    ).toBe(true);
+    // Funding selects the return draft, without declaring it or starting its deadline.
+    expect(
+      JSON.parse(window.localStorage.getItem("pact-demo-v1") ?? "null")
+        .agreement.handover.returnRecord,
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Initial condition" }));
+    expect(
+      screen.getByRole("button", { name: "Initial condition" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Return declaration" }));
+    expect(screen.getByLabelText("Return location")).toHaveValue(
+      initial.agreement.address,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Submit return declaration" }),
+    );
+    expect(
+      await screen.findByText("Add at least one return condition photo."),
+    ).toBeVisible();
+    expect(
+      JSON.parse(window.localStorage.getItem("pact-demo-v1") ?? "null")
+        .agreement.status,
+    ).toBe("ACTIVE");
   });
 });

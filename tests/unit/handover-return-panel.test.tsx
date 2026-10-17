@@ -98,6 +98,37 @@ function props(): ReturnPanelProps & { baseline: BaselineRecord } {
 }
 
 describe("ReturnPanel", () => {
+  it.each(["browser-demo", "supabase"] as const)(
+    "uses draft presets only for browser demos (%s)",
+    (mode) => {
+      const settings = props();
+      settings.storage = { ...settings.storage, mode };
+      settings.baseline.checklist = [
+        { id: "keys", label: "Keys", checked: true, note: "Two keys" },
+      ];
+      render(
+        <ReturnPanel
+          {...settings}
+          demoPreset={{
+            location: "Demo handover desk",
+            notes: "Keys returned",
+          }}
+        />,
+      );
+      expect(screen.getByLabelText("Return location")).toHaveValue(
+        mode === "browser-demo" ? "Demo handover desk" : "",
+      );
+      expect(screen.getByLabelText("Return condition notes")).toHaveValue(
+        mode === "browser-demo" ? "Keys returned" : "",
+      );
+      expect(screen.getByRole("checkbox")).toHaveProperty(
+        "checked",
+        mode === "browser-demo",
+      );
+      expect(settings.onSubmitReturn).not.toHaveBeenCalled();
+    },
+  );
+
   function fillReturn() {
     fireEvent.change(screen.getByLabelText("Return location"), {
       target: { value: "Front desk" },
