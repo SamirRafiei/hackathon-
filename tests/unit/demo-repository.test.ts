@@ -3,6 +3,8 @@ import { LocalDemoRepository } from "@/features/demo/repository";
 import {
   acceptTerms,
   approveFullRefund,
+  approveSplit,
+  createDemoAgreement,
   createInitialDemoSnapshot,
   declineSplit,
   fundAgreement,
@@ -58,6 +60,55 @@ describe("LocalDemoRepository", () => {
       proposal: null,
     });
     expect(reloaded?.agreement.ledger).toEqual(refunded.agreement.ledger);
+  });
+
+  it("reloads an approved equipment split with final totals and no reserved funds", async () => {
+    const repository = new LocalDemoRepository();
+    const camera = createDemoAgreement(demoActors.landlord, {
+      assetType: "EQUIPMENT",
+      title: "Camera deposit",
+      address: "Budapest pickup point",
+      startDate: "2026-11-01",
+      endDate: "2026-11-08",
+      amountMinor: 30_000,
+      terms: "Return the camera and accessories in recorded condition.",
+    });
+    const returned = returnReviewDemoSnapshot(camera);
+    const first = proposeSplit(
+      returned,
+      demoActors.landlord,
+      2_500,
+      "Repair quote",
+    );
+    const revised = proposeSplit(
+      declineSplit(first, demoActors.tenant),
+      demoActors.landlord,
+      2_000,
+      "Revised repair quote",
+    );
+    repository.save(revised);
+    const pending = await repository.load();
+    expect(pending?.agreement.reservedMinor).toBe(30_000);
+    expect(pending?.agreement.proposal).toMatchObject({
+      version: 2,
+      tenantApproved: false,
+    });
+
+    const settled = approveSplit(revised, demoActors.tenant);
+    repository.save(settled);
+    const reloaded = await repository.load();
+    expect(reloaded?.agreement).toMatchObject({
+      status: "COMPLETED",
+      reservedMinor: 0,
+      proposal: {
+        version: 2,
+        renterRefundMinor: 28_000,
+        ownerAllocationMinor: 2_000,
+        tenantApproved: true,
+      },
+    });
+    expect(reloaded?.agreement.ledger).toEqual(settled.agreement.ledger);
+    expect(reloaded?.agreement.activity).toEqual(settled.agreement.activity);
   });
 
   it("loads demo saves written before asset type and agreement terms were added", async () => {

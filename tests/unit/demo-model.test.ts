@@ -126,6 +126,18 @@ describe("Pact demo agreement lifecycle", () => {
     expectBalancedLedger(funded);
   });
 
+  it("rejects a second funding attempt without adding another reservation", () => {
+    const funded = fundAgreement(acceptedSnapshot(), demoActors.tenant);
+    const originalLedger = structuredClone(funded.agreement.ledger);
+
+    expect(() => fundAgreement(funded, demoActors.tenant)).toThrow(
+      "Both parties must accept before funding.",
+    );
+    expect(funded.agreement.reservedMinor).toBe(DEMO_AMOUNT_MINOR);
+    expect(funded.agreement.ledger).toEqual(originalLedger);
+    expectBalancedLedger(funded);
+  });
+
   it("requires funding before the tenant can record a return", () => {
     expect(() => submitReturn(acceptedSnapshot(), demoActors.tenant)).toThrow(
       "The agreement must be funded before return can be recorded.",
@@ -224,6 +236,22 @@ describe("Pact demo agreement lifecycle", () => {
     expect(() =>
       approveSplit(returnReviewSnapshot(), demoActors.tenant),
     ).toThrow("There is no open split proposal to approve.");
+  });
+
+  it("keeps all funds reserved while a split awaits the renter's answer", () => {
+    const proposed = proposeSplit(
+      returnReviewSnapshot(),
+      demoActors.landlord,
+      2_500,
+      "Camera repair",
+    );
+
+    expect(() => approveFullRefund(proposed, demoActors.landlord)).toThrow(
+      "A full refund can only be approved during return review.",
+    );
+    expect(proposed.agreement.reservedMinor).toBe(DEMO_AMOUNT_MINOR);
+    expect(proposed.agreement.ledger).toHaveLength(2);
+    expectBalancedLedger(proposed);
   });
 
   it("allows the landlord to complete a full refund during return review", () => {
