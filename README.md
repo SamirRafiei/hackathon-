@@ -2,7 +2,7 @@
 
 Make a pact. Keep it fair.
 
-Team starter for the Pact hackathon. This repository contains the application foundation and development tools. Product features, authentication flows, database tables, policies, payments, and handover/dispute workflows are **not implemented yet**. See [plan.md](./plan.md) for the agreed product rules and delivery checklist.
+Pact hackathon application foundation with Stage 1 database schema, integrity checks, RLS, private evidence policies, shared domain contracts and tested contribution allocation. Product screens, authentication flows, financial mutation RPCs, and handover/dispute workflows are **not implemented yet**. See [plan.md](./plan.md) for the agreed rules, [schema v1](./supabase/SCHEMA.md) for database details and [operation contracts](./supabase/OPERATIONS.md) for the team handoff.
 
 Pact is pitched as a proposed agreement/deposit layer within the Wise ecosystem. The prototype is a standalone Next.js/Supabase app with simulated financial operations; it has no Wise integration.
 
@@ -57,12 +57,12 @@ src/
     disputes/          Claims, negotiation, reviewer workspace
   lib/
     auth/              Future server identity and membership checks
-    domain/            Future shared schemas and operation contracts
+    domain/            Shared validation, allocation, DTOs and operation contracts
     supabase/          Browser and server client factories
     env.ts             Lazy public Supabase environment validation
     utils.ts           Tailwind-aware class name helper
   types/database.ts    Explicit empty-schema placeholder; generate after migrations
-supabase/              Local configuration, future migrations and seed data
+supabase/              Local configuration, schema/RLS migrations and documentation
 scripts/               Database type-generation utility
 tests/unit/            Future focused domain/component tests
 tests/e2e/             Future Playwright transaction journeys
@@ -96,7 +96,8 @@ Only Next.js, the stylesheet, and startup page run initially. Load scanner/QR an
 | `npm run lint` / `npm run lint:fix`            | Biome lint checks / fixes                             |
 | `npm run typecheck`                            | Generate route types and check TypeScript             |
 | `npm run format` / `npm run format:check`      | Format / verify formatting (`plan.md` excluded)       |
-| `npm test` / `npm run test:watch`              | Vitest run / watch                                    |
+| `npm test` / `npm run test:watch`              | Domain and embedded PostgreSQL tests / watch          |
+| `npm run test:db`                              | Migration, integrity and RLS tests without Docker     |
 | `npm run test:e2e` / `npm run test:e2e:ui`     | Playwright journeys / interactive runner              |
 | `npm run check`                                | Lint, types, formatting, unit tests, production build |
 | `npm run db:start` / `npm run db:stop`         | Start / stop local Supabase (requires Docker)         |
@@ -105,7 +106,7 @@ Only Next.js, the stylesheet, and startup page run initially. Load scanner/QR an
 | `npm run db:types`                             | Generate types from running local Supabase            |
 | `npm run db:types -- --project-id PROJECT_REF` | Generate types from an authorized hosted project      |
 
-Vitest and Playwright are configured, but **no product tests exist yet**. Vitest permits an empty suite for this scaffold; remove `--passWithNoTests` once meaningful tests land. Playwright reports no tests until the team adds journeys. Before running the first browser test, install Chromium with `npx playwright install chromium` (on Linux CI use `--with-deps`). GitHub Actions currently runs `npm run check`, not browser tests.
+Vitest runs contribution allocation, shared validation, and actual migrations/RLS in embedded PostgreSQL (PGlite). Empty suites no longer pass. Supabase-owned Auth/Storage infrastructure is minimally stubbed for database tests; full Supabase integration and concurrency tests remain required. Playwright reports no tests until the team adds journeys. Before the first browser test, install Chromium with `npx playwright install chromium` (on Linux CI use `--with-deps`). GitHub Actions runs `npm run check`, including the database tests, but not browser journeys.
 
 ## Supabase workflow
 
@@ -122,7 +123,7 @@ npm run db:types
 
 For an existing hosted project, authenticate with `npx supabase login` and generate types using the project reference command above. The project ID flag is explicit; the script does not load `.env.local`. Coordinate linking, schema application, and remote writes with Sameer. Do not independently push competing migrations to the shared database.
 
-No app tables, migrations, RLS policies, storage buckets, reviewer grants, cron jobs, or seed users have been created by this starter. `src/types/database.ts` deliberately declares an empty schema until the real database exists. The generator writes that file only after a successful CLI response.
+Ordered Stage 1 migrations create the application tables, integrity checks, RLS and private evidence bucket. No hosted schema has been applied, reviewer/users provisioned, cron scheduled, or financial RPCs enabled. `src/types/database.ts` remains an explicit empty-schema placeholder because official local generation is blocked by the missing Docker engine. The generator writes only after a successful CLI response; do not invent database types. See [schema setup](./supabase/SCHEMA.md) for application and verification steps.
 
 ## Before feature work
 

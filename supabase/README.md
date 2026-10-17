@@ -1,7 +1,15 @@
 # Database workspace — Sameer
 
-`config.toml` configures local Supabase only. `migrations/` is reserved for ordered schema, constraints, RLS, controlled functions, and scheduler changes. `seed.sql` is intentionally empty of product data.
+Schema v1, integrity triggers, RLS and private Storage policies are implemented in
+ordered [migrations](./migrations/). Read [SCHEMA.md](./SCHEMA.md) for the entity map,
+permissions, defaults, migration commands and verification limits. Read
+[OPERATIONS.md](./OPERATIONS.md) for the contract handoff and required atomic RPCs.
 
-No hosted project has been provisioned, linked, or changed. Start locally with Docker and `npm run db:start`, or coordinate an authorized hosted project with the team. Define the real schema before generating `src/types/database.ts`.
+`config.toml` remains local Supabase configuration. `seed.sql` remains free of
+product data and credentials. No hosted project has been provisioned, linked or
+modified. No financial engine, mutation RPC or scheduler job is enabled yet.
 
-All app tables, storage policies, grants, and cron jobs still need implementation. Do not assume generated local defaults enforce Pact's participant or reviewer permissions.
+Run `npm test` or `npm run test:db` for executable embedded PostgreSQL verification
+without Docker. With the actual local Supabase stack running, apply migrations and
+run `npm run db:types`. The generated types file remains unchanged until the official
+generator succeeds against a real Supabase database.
