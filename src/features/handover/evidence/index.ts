@@ -1,5 +1,6 @@
 export { EvidenceUploader } from "./evidence-uploader";
 export { EvidencePreview } from "./evidence-preview";
+export { signedEvidenceDownload } from "./download";
 export type { EvidenceUploaderProps } from "./evidence-uploader";
 export {
   BrowserDemoEvidenceStorage,
