@@ -383,28 +383,7 @@ export default function DemoWorkspace() {
           />
         )}
 
-        <HandoverWorkspace
-          key={agreement.id}
-          agreement={agreement}
-          actor={actor}
-          onBaselineChange={(record) =>
-            commitHandover((current, currentActor) =>
-              recordBaseline(current, currentActor, record),
-            )
-          }
-          onSubmitReturn={(record) =>
-            commitHandover((current, currentActor) =>
-              submitReturn(current, currentActor, record),
-            )
-          }
-          onSubmitInspection={(record) =>
-            commitHandover((current, currentActor) =>
-              recordArrivalInspection(current, currentActor, record),
-            )
-          }
-        />
-
-        <div className="dashboard-grid">
+        <div className="space-y-6">
           <section
             aria-labelledby="agreement-heading"
             className="agreement-card"
@@ -843,7 +822,28 @@ export default function DemoWorkspace() {
             </div>
           </section>
 
-          <aside className="side-column">
+          <HandoverWorkspace
+            key={agreement.id}
+            agreement={agreement}
+            actor={actor}
+            onBaselineChange={(record) =>
+              commitHandover((current, currentActor) =>
+                recordBaseline(current, currentActor, record),
+              )
+            }
+            onSubmitReturn={(record) =>
+              commitHandover((current, currentActor) =>
+                submitReturn(current, currentActor, record),
+              )
+            }
+            onSubmitInspection={(record) =>
+              commitHandover((current, currentActor) =>
+                recordArrivalInspection(current, currentActor, record),
+              )
+            }
+          />
+
+          <aside className="grid gap-6 md:grid-cols-2">
             <section aria-labelledby="next-step-heading" className="next-card">
               <div className="side-card-header">
                 <span className="side-card-icon">

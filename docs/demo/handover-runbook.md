@@ -14,7 +14,7 @@ Owner: Tayma AlDabbas. Scope: T1–T3 in [plan.md](../../plan.md). Fake actors, 
 
 ## Apartment: unchanged condition and full refund
 
-The local apartment baseline now starts with editable demo details: the agreement address, two keys, furnished-room inventory, an existing wall mark and completed draft checklist entries. Review/change these values as needed, upload your photos live and publish. No photos or acknowledgements are created automatically. The evidence card appears before the agreement summary and side cards. Existing published baselines remain unchanged.
+The local apartment baseline now starts with editable demo details: the agreement address, two keys, furnished-room inventory, an existing wall mark and completed draft checklist entries. Review/change these values as needed, upload your photos live and publish. No photos or acknowledgements are created automatically. The agreement summary appears first, followed by evidence, then the next-action and details cards. Existing published baselines remain unchanged.
 
 Confirmed setup: **Apartment security deposit**, property **Fictional unit DEMO-18, Budapest**, **€1,000**, **2026-10-01 → 2026-10-17**. **Reset demo** and the apartment form use the same values. Keep the prefilled terms from the [setup reference](setup-values.md).
 

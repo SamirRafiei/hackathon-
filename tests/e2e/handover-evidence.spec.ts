@@ -164,11 +164,15 @@ async function publish(
   const evidenceBounds = required(
     await page.locator("#condition-records").boundingBox(),
   );
-  const dashboardBounds = required(
-    await page.locator(".dashboard-grid").boundingBox(),
+  const agreementBounds = required(
+    await page.locator(".agreement-card").boundingBox(),
+  );
+  const nextBounds = required(await page.locator(".next-card").boundingBox());
+  expect(agreementBounds.y + agreementBounds.height).toBeLessThanOrEqual(
+    evidenceBounds.y,
   );
   expect(evidenceBounds.y + evidenceBounds.height).toBeLessThanOrEqual(
-    dashboardBounds.y,
+    nextBounds.y,
   );
   await panel
     .getByRole("textbox", { name: "Caption for new files" })

@@ -49,7 +49,7 @@ replaced raw native file controls with prominent upload/camera buttons, supporte
 
 ## Live-demo input update — 17 October 2026
 
-apartment baseline drafts receive editable preset identifying details from the current agreement address plus sample condition/inventory/key notes and draft checklist selections. Presets apply only to browser-demo storage; photo uploads remain empty and mandatory, and publication/tenant acknowledgement remain explicit. Evidence is placed before the agreement/next-action/details grid on desktop and mobile. Existing submitted records are preserved. Regression coverage checks missing-photo rejection with presets, the live file chooser and the evidence-before-summary layout.
+apartment baseline drafts receive editable preset identifying details from the current agreement address plus sample condition/inventory/key notes and draft checklist selections. Presets apply only to browser-demo storage; photo uploads remain empty and mandatory, and publication/tenant acknowledgement remain explicit. The agreement card appears first, evidence second, followed by next-action/details cards on desktop and mobile. Existing submitted records are preserved. Regression coverage checks missing-photo rejection with presets, the live file chooser and the agreement → evidence → next-action layout.
 
 ## Post-demo backend handoff
 
