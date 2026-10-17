@@ -1,4 +1,4 @@
-# Database workspace
+# Database workspace — Sameer
 
 Schema v1, integrity triggers, RLS and private Storage policies are implemented in
 ordered [migrations](./migrations/). Read [SCHEMA.md](./SCHEMA.md) for the entity map,
@@ -7,18 +7,13 @@ permissions, defaults, migration commands and verification limits. Read
 
 `config.toml` remains local Supabase configuration. `seed.sql` remains free of
 product data and credentials. No hosted project has been provisioned, linked or
-modified. The security-deposit return-review window is 48 hours; invitation and
-negotiation deadlines may be 24 hours as described in the operations documents.
-The migrations add [simulated funding RPCs and a bounded worker](./FUNDING.md)
-plus [atomic pre-handover cancellation and refunds](./CANCELLATION.md). The worker
-is a callable database operation, not a deployed schedule. Other workflow RPCs
-and scheduled deployment remain pending.
+modified. Stage 2A adds [simulated funding RPCs and a bounded worker](./FUNDING.md);
+Stage 2B adds [atomic pre-handover cancellation and refunds](./CANCELLATION.md).
+Stage 2C adds [full and partial settlement RPCs](./SETTLEMENTS.md). Other workflow
+RPCs and scheduled deployment remain pending. Migration 007 adds authenticated
+agreement setup, invitation claiming, and acceptance.
 
 Run `npm test` or `npm run test:db` for executable embedded PostgreSQL verification
-without Docker. PGlite does not replace hosted Supabase tests or prove true
-concurrent behavior. The interactive demo does not call these migrations or RPCs;
-server identity verification, application route wiring, the remaining lifecycle
-operations, and production worker scheduling are not implemented. With the actual
-local Supabase stack running, apply migrations and run `npm run db:types`. The
-generated types file remains unchanged until the official generator succeeds
-against a real Supabase database.
+without Docker. With the actual local Supabase stack running, apply migrations and
+run `npm run db:types`. The generated types file remains unchanged until the official
+generator succeeds against a real Supabase database.

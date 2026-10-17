@@ -53,8 +53,7 @@ becomes failed, while current agreement/version gates prevent inappropriate retr
 If cancellation acquires the agreement lock first, it reconciles the persisted
 simulated outcome in its own transaction before creating the cancellation refund;
 see [Stage 2B cancellation](./CANCELLATION.md).
-Pre-handover cancellation/refunds are implemented by migration 005; return and
-post-handover dispute settlements remain future workflow operations.
+Cancellation/refund implementation is in migration 005.
 
 Completion returns `ok: true` when the processing operation succeeds, with explicit
 `attemptState: succeeded | failed | cancelled`. A simulated decline is a successful
@@ -71,7 +70,8 @@ All transitions lock agreement first, then contribution, then attempt. Global ke
 conflicts use `INSERT ... ON CONFLICT` and stored-result lookup. Batch workers process
 agreements in stable order. Cancellation and revision RPCs must follow the same
 agreement-lock protocol. If completion wins, cancellation must refund the secured
-amount; if cancellation wins, completion cannot secure it.
+amount; if cancellation wins, completion cannot secure it. Post-handover full and
+partial dispositions are implemented in [SETTLEMENTS.md](./SETTLEMENTS.md).
 
 ## Deterministic failure fixture
 
@@ -108,8 +108,8 @@ Runtime schemas validate input/results and sanitize transport failures. Do not w
 handler must use Valera's verified auth/session setup and a user-scoped client.
 
 The transport interface is hand-authored, not invented generated database types.
-The existing empty `src/types/database.ts` remains unchanged until the official
-Supabase generator can connect. Apply migrations 001–005, generate types, then wire
+The checked-in `src/types/database.ts` is a hand-maintained typed subset, not a
+generated schema. Apply migrations 001–007, generate types from the applied schema, then wire
 the typed Supabase clients at the server composition boundary. No hosted setup is
 assumed. Agreement creation/publication/acceptance RPCs are still separate work;
 local tests provision coherent accepted fixtures through administrator SQL.
@@ -117,7 +117,7 @@ local tests provision coherent accepted fixtures through administrator SQL.
 ## Local verification and limits
 
 `npm test` runs the complete suite; `npm run test:db` runs migration, integrity,
-funding and cancellation tests. Coverage includes authorization, unanimous acceptance, processing/due times,
+funding, cancellation, and settlement tests. Coverage includes authorization, unanimous acceptance, processing/due times,
 separate group contributions, balanced postings, deterministic declines/retries,
 same/different-key duplicates, payload conflicts, stale versions, rollback injection,
 bounded workers and cancellation-first/completion-first orderings.

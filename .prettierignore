@@ -11,3 +11,4 @@ next-env.d.ts
 src/types/database.ts
 supabase/.temp
 plan.md
+AGENTS.md

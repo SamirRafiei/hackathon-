@@ -158,10 +158,10 @@ export default function DemoWorkspace() {
           "The agreement or identity changed. Review the current screen before continuing.",
         );
       const next = action(latest, actor);
+      repository.save(next);
       latestSnapshot.current = next;
       setSnapshot(next);
       setNotice("");
-      void repository.save(next);
       return true;
     } catch (error) {
       setNotice(
@@ -190,10 +190,19 @@ export default function DemoWorkspace() {
       ...snapshot,
       activeActorId: resolvedActor.id as DemoSnapshot["activeActorId"],
     };
-    setSnapshot(next);
-    setNotice("");
-    setTenantConfirmedTerms(false);
-    void repository.save(next);
+    try {
+      repository.save(next);
+      latestSnapshot.current = next;
+      setSnapshot(next);
+      setNotice("");
+      setTenantConfirmedTerms(false);
+    } catch (error) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "The demo identity could not be saved.",
+      );
+    }
   }
 
   function sendProposal(event: FormEvent<HTMLFormElement>) {
@@ -208,24 +217,32 @@ export default function DemoWorkspace() {
   }
 
   async function resetDemo() {
-    await repository.reset();
-    const initial = createInitialDemoSnapshot();
-    setSnapshot(initial);
-    setAllocationInput("300");
-    setReasonInput("Cleaning and key replacement costs");
-    setShowSetup(false);
-    setTenantConfirmedTerms(false);
-    setNotice("Demo agreement reset to its starting point.");
+    try {
+      await repository.reset();
+      const initial = createInitialDemoSnapshot();
+      latestSnapshot.current = initial;
+      setSnapshot(initial);
+      setAllocationInput("300");
+      setReasonInput("Cleaning and key replacement costs");
+      setShowSetup(false);
+      setTenantConfirmedTerms(false);
+      setNotice("Demo agreement reset to its starting point.");
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? error.message : "The demo could not be reset.",
+      );
+    }
   }
 
   function createAgreement(input: Parameters<typeof createDemoAgreement>[1]) {
     try {
       const next = createDemoAgreement(actor, input);
+      repository.save(next);
+      latestSnapshot.current = next;
       setSnapshot(next);
       setShowSetup(false);
       setTenantConfirmedTerms(false);
       setNotice("Version 1 is ready for the tenant to review and accept.");
-      void repository.save(next);
     } catch (error) {
       setNotice(
         error instanceof Error

@@ -1,4 +1,4 @@
-/** Hand-maintained schema subset for account setup and private evidence reads. */
+/** Hand-maintained, incomplete schema subset for account setup and private evidence reads. Not generated database types. */
 export type Json =
   | string
   | number

@@ -174,6 +174,14 @@ export interface DomainOperations {
     },
     TransitionResult & { proposalId: UUID }
   >;
+  settleAgreement: Operation<
+    MutationInput &
+      (
+        | { kind: "proposal"; proposalId: UUID }
+        | { kind: "reviewer_decision"; caseId: UUID }
+      ),
+    TransitionResult
+  >;
   acceptSettlement: Operation<
     MutationInput & { proposalId: UUID },
     TransitionResult
@@ -220,6 +228,15 @@ export interface DepositProvider {
   cancel(
     input: OperationInput<"cancelAgreement">,
   ): Promise<OperationResult<OperationOutput<"cancelAgreement">>>;
+  approveFullRefund(
+    input: OperationInput<"approveFullRefund">,
+  ): Promise<OperationResult<OperationOutput<"approveFullRefund">>>;
+  settle(
+    input: OperationInput<"settleAgreement">,
+  ): Promise<OperationResult<OperationOutput<"settleAgreement">>>;
+  processDueInspections(
+    input: OperationInput<"processDueInspections">,
+  ): Promise<OperationResult<OperationOutput<"processDueInspections">>>;
   complete(
     input: OperationInput<"completeSimulatedContribution">,
   ): Promise<OperationResult<OperationOutput<"completeSimulatedContribution">>>;

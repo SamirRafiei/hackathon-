@@ -5,6 +5,7 @@ import {
   fundAgreement,
   recordBaseline,
   submitReturn,
+  type DemoSnapshot,
 } from "@/features/demo/model";
 import {
   acknowledgeBaseline,
@@ -18,10 +19,11 @@ export const fixtureTime = "2026-10-17T10:00:00.000Z";
 export function conditionPhoto(
   phase: EvidenceFile["phase"],
   uploaderId: string,
+  agreementId = "demo-apartment-agreement",
 ): EvidenceFile {
   return {
     id: `photo-${phase}`,
-    agreementId: "demo-apartment-agreement",
+    agreementId,
     phase,
     fileName: "condition.png",
     mimeType: "image/png",
@@ -31,30 +33,32 @@ export function conditionPhoto(
     uploaderId,
     caption: "Condition photo",
     storage: "browser-demo",
-    objectPath: `demo-apartment-agreement/${phase}/photo`,
+    objectPath: `${agreementId}/${phase}/photo`,
     submittedAt: fixtureTime,
   };
 }
-export function activeDemoSnapshot() {
+export function activeDemoSnapshot(initial = createInitialDemoSnapshot()) {
   let snapshot = fundAgreement(
-    acceptTerms(createInitialDemoSnapshot(), demoActors.tenant),
+    acceptTerms(initial, demoActors.tenant),
     demoActors.tenant,
   );
   const baseline = publishBaseline({
     id: "baseline-1",
     agreementId: snapshot.agreement.id,
     termsVersion: 1,
-    assetType: "APARTMENT",
+    assetType: snapshot.agreement.assetType,
     actor: { ...demoActors.landlord, role: "owner" },
     ownerId: demoActors.landlord.id,
     previous: null,
     identifier: "Apartment 18, keys 1 and 2",
     notes: "Existing wall mark photographed",
-    checklist: baselineChecklist("APARTMENT").map((item) => ({
+    checklist: baselineChecklist(snapshot.agreement.assetType).map((item) => ({
       ...item,
       checked: true,
     })),
-    evidence: [conditionPhoto("baseline", demoActors.landlord.id)],
+    evidence: [
+      conditionPhoto("baseline", demoActors.landlord.id, snapshot.agreement.id),
+    ],
     now: fixtureTime,
   });
   snapshot = recordBaseline(snapshot, demoActors.landlord, baseline);
@@ -92,11 +96,13 @@ export function declaredReturn(snapshot = activeDemoSnapshot()) {
       checked: true,
       note: "",
     })),
-    evidence: [conditionPhoto("return", demoActors.tenant.id)],
+    evidence: [
+      conditionPhoto("return", demoActors.tenant.id, snapshot.agreement.id),
+    ],
     now: fixtureTime,
   });
 }
-export function returnReviewDemoSnapshot() {
-  const snapshot = activeDemoSnapshot();
+export function returnReviewDemoSnapshot(initial?: DemoSnapshot) {
+  const snapshot = activeDemoSnapshot(initial);
   return submitReturn(snapshot, demoActors.tenant, declaredReturn(snapshot));
 }

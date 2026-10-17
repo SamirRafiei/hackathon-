@@ -1,7 +1,14 @@
 # PACT schema v1
 
-Stage 1 provides structure, integrity, access, allocation and contracts. It does not
-expose business mutation RPCs or run financial jobs. All money is simulated.
+Migrations 001–003 provide the schema, integrity and access foundation. Migrations
+004–006 implement simulated funding, pre-handover cancellation and full/partial
+settlements. All money is simulated; scheduled routines are callable but are not
+configured with a Cron schedule here.
+
+This schema retains the earlier group-deposit model. The revised `plan.md` limits
+the MVP to one renter and adds a reservation-advance purpose; the latter and its
+distinct release/refund rules are not yet represented in these migrations. Do not
+use the existing security-deposit settlement RPC to release an advance.
 
 ## Apply and verify
 
@@ -10,6 +17,10 @@ Apply migrations in timestamp order:
 1. `20261017000100_schema_v1.sql`: enums, 31 tables, keys, checks, indexes, RLS and revoked API grants.
 2. `20261017000200_integrity.sql`: allocation, immutable history, snapshot/ledger/settlement integrity triggers.
 3. `20261017000300_access.sql`: identity-bound read policies, limited safe writes, private evidence bucket/policies.
+4. `20261017000400_simulated_funding.sql`: borrower funding, trusted payment completion and bounded payment worker.
+5. `20261017000500_cancellation.sql`: atomic pre-handover cancellation and contribution refunds.
+6. `20261017000600_settlements.sql`: owner/expiry full refunds, unanimous/reviewer disposition and proportional allocations.
+7. `20261017000700_agreement_setup.sql`: verified account setup, invitation claiming and exact-version acceptance.
 
 Each migration is transactional. They target a fresh Supabase PostgreSQL 17 project
 with its existing `auth` and `storage` schemas. These are recorded ordered migrations,
@@ -20,7 +31,8 @@ on a fresh instance. On an existing local instance, use
 `npx supabase migration up --local`, then `npm run db:types`. Use `npm.cmd`/`npx.cmd`
 on Windows if execution policy blocks PowerShell wrappers. Do not reset a shared
 database to apply changes. Sameer coordinates hosted application and generated types.
-Never hand-edit `src/types/database.ts` to approximate missing generated types.
+The current `src/types/database.ts` is an incomplete hand-maintained adapter for
+the account UI; replace it with generated types after applying the final schema.
 
 `npm test` includes embedded PostgreSQL tests; `npm run test:db` isolates them.
 The harness applies the actual migrations to PGlite with minimal Supabase-owned
@@ -71,14 +83,16 @@ Account deletion/anonymization needs a separately reviewed policy.
 - Deposit: 1–100,000,000 minor units (up to 1,000,000 major units). These are
   documented engineering limits. Money is bigint, shares are integer basis points.
   Rental fee is terms only, never collected.
-- Inspection and unacknowledged-return review use the current product's 48-hour policy; negotiation remains 24 hours.
-  Invitation validity defaults to 24 hours. Challenges allow at most 10 minutes,
+- The existing security-deposit inspection constraint is 48 hours. Negotiation and
+  invitation validity remain 24 hours. Challenges allow at most 10 minutes,
   five attempts by default (bounded to 1–10).
-- Return review requires exactly `returned_at + interval '48 hours'`. Once recorded,
-  receipt/deadline cannot change. The future operation supplies server time.
+- The existing schema requires exactly `returned_at + interval '48 hours'`. Once
+  recorded, the timestamp/deadline cannot change. The pending authoritative return
+  operation must set `returned_at` from the first renter declaration, not owner
+  acknowledgment, under the revised plan.
 - Agreement updates increment `revision`. Enums/checks enforce representation and
-  required timestamps. **Legal transition edges and funding/consent gates still
-  require Stage 2 RPCs**; direct client state writes remain blocked meanwhile.
+  required timestamps. Stage 2 RPCs implement funding, cancellation and settlement
+  transitions; other legal transition edges and consent gates remain future work.
 - Funded/frozen agreements reject participant and published-term changes.
 - Versions, snapshot rows, acceptances, proposals/votes, decisions/evidence references,
   settlements/allocations, ledger and audit records are append-only.
@@ -93,10 +107,12 @@ Account deletion/anonymization needs a separately reviewed policy.
   cannot exceed the recorded claim or secured funds. Receipt decisions are distinct.
 
 Example postings: funding has source `-15000`, restricted `+15000`; settlement has
-restricted `-25000`, refunds `+10200/+6800`, owner `+8000`. Stage 2 must enforce
-aggregate-to-ledger reconciliation, per-account balances, all-party consent, capped
-proportional deductions and atomic unique disposition. Balanced rows alone do not
-authorize payment. Unresolved cases must never produce automatic payouts.
+restricted `-25000`, refunds `+10200/+6800`, owner `+8000`. Migration 006 enforces
+atomic unique disposition and proportional integer-minor-unit deductions with a
+stable participant-ID tie-break. Settlement execution requires a unanimous current
+proposal or an authorized persisted reviewer financial decision; inspection expiry
+cannot release a timely claimed deposit. Balanced rows alone do not authorize
+payment. Unresolved cases must never produce automatic payouts.
 
 ## Access matrix
 

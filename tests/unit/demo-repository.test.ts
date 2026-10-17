@@ -1,14 +1,19 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import { LocalDemoRepository } from "@/features/demo/repository";
 import {
   acceptTerms,
+  approveFullRefund,
   createInitialDemoSnapshot,
+  declineSplit,
   fundAgreement,
+  proposeSplit,
 } from "@/features/demo/model";
 import { demoActors } from "@/lib/auth/identity-provider";
+import { returnReviewDemoSnapshot } from "./fixtures/handover";
 
 describe("LocalDemoRepository", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     window.localStorage.clear();
   });
 
@@ -19,6 +24,40 @@ describe("LocalDemoRepository", () => {
     await repository.save(snapshot);
 
     expect(await repository.load()).toEqual(snapshot);
+  });
+
+  it("reloads funded, returned, and fully refunded state after a rejected split", async () => {
+    const repository = new LocalDemoRepository();
+    const funded = fundAgreement(
+      acceptTerms(createInitialDemoSnapshot(), demoActors.tenant),
+      demoActors.tenant,
+    );
+    repository.save(funded);
+    expect((await repository.load())?.agreement.reservedMinor).toBe(100_000);
+
+    const returned = returnReviewDemoSnapshot();
+    repository.save(returned);
+    expect((await repository.load())?.agreement.status).toBe("RETURN_REVIEW");
+    expect((await repository.load())?.agreement.handover?.returnRecord).toEqual(
+      returned.agreement.handover?.returnRecord,
+    );
+
+    const proposed = proposeSplit(
+      returned,
+      demoActors.landlord,
+      8_000,
+      "Repair",
+    );
+    const declined = declineSplit(proposed, demoActors.tenant);
+    const refunded = approveFullRefund(declined, demoActors.landlord);
+    repository.save(refunded);
+    const reloaded = await repository.load();
+    expect(reloaded?.agreement).toMatchObject({
+      status: "COMPLETED",
+      reservedMinor: 0,
+      proposal: null,
+    });
+    expect(reloaded?.agreement.ledger).toEqual(refunded.agreement.ledger);
   });
 
   it("loads demo saves written before asset type and agreement terms were added", async () => {
@@ -73,5 +112,31 @@ describe("LocalDemoRepository", () => {
     await repository.reset();
 
     expect(await repository.load()).toBeNull();
+  });
+
+  it("reports a failed write instead of pretending the new state was saved", async () => {
+    const repository = new LocalDemoRepository();
+    const initial = createInitialDemoSnapshot();
+    repository.save(initial);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("Quota exceeded");
+    });
+
+    expect(() =>
+      repository.save(acceptTerms(initial, demoActors.tenant)),
+    ).toThrow("could not save the demo change");
+    expect(await repository.load()).toEqual(initial);
+  });
+
+  it("reports a failed reset and keeps the saved agreement", async () => {
+    const repository = new LocalDemoRepository();
+    const initial = createInitialDemoSnapshot();
+    repository.save(initial);
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new Error("Storage blocked");
+    });
+
+    await expect(repository.reset()).rejects.toThrow("could not reset");
+    expect(await repository.load()).toEqual(initial);
   });
 });

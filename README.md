@@ -6,7 +6,7 @@ Pact is a prototype for making rental deposits easier to understand and settle f
 
 The idea can fit inside a banking app or another trusted host experience. This standalone prototype has no banking-provider integration and does not hold, move, or protect real money.
 
-The repository includes a Supabase-backed account flow for email/password sign-in, agreement creation, invitation claiming, and exact-version acceptance. The separate landing-page walkthrough remains browser-local. Database migrations also define the broader ledger and simulated funding/cancellation foundation; funding and the remaining rental lifecycle are not connected to the account flow yet.
+The repository includes a Supabase-backed account flow for email/password sign-in, agreement creation, invitation claiming, and exact-version acceptance. The separate landing-page walkthrough remains browser-local. Database migrations also define simulated funding, cancellation, and settlement operations, but these financial operations and the remaining rental lifecycle are not connected to the authenticated account screens yet. The reservation-advance purpose in the revised plan is not implemented.
 
 ## Start locally
 
@@ -32,7 +32,7 @@ src/
   components/ui/       Shared accessible UI components
   features/
     demo/               Seeded agreement, local demo repository, interactive workflow
-    agreements/        Local demo setup form; authenticated persistence is pending
+    agreements/        Local demo setup form and authenticated agreement setup/acceptance
     deposits/          Reserved for future provider, persistent funding, transaction history
     handover/          Evidence adapters, baseline consent, return, comparison, arrival inspection
     disputes/          Claims, negotiation, reviewer workspace

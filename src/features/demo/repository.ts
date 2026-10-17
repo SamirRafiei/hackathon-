@@ -3,7 +3,7 @@ import { demoSnapshotSchema, type DemoSnapshot } from "@/features/demo/model";
 /** Storage boundary. A server-backed Supabase repository can implement this later. */
 export interface PactRepository {
   load(): Promise<DemoSnapshot | null>;
-  save(snapshot: DemoSnapshot): Promise<void>;
+  save(snapshot: DemoSnapshot): void;
   reset(): Promise<void>;
 }
 
@@ -20,11 +20,13 @@ export class LocalDemoRepository implements PactRepository {
     }
   }
 
-  async save(snapshot: DemoSnapshot) {
+  save(snapshot: DemoSnapshot) {
     try {
       window.localStorage.setItem("pact-demo-v1", JSON.stringify(snapshot));
     } catch {
-      // Storage can be unavailable in private browsing or restricted contexts.
+      throw new Error(
+        "This browser could not save the demo change. Free up storage or use another browser and retry.",
+      );
     }
   }
 
@@ -32,7 +34,9 @@ export class LocalDemoRepository implements PactRepository {
     try {
       window.localStorage.removeItem("pact-demo-v1");
     } catch {
-      // The in-memory demo can still be reset if browser storage is unavailable.
+      throw new Error(
+        "This browser could not reset the saved demo. Check storage access and retry.",
+      );
     }
   }
 }
