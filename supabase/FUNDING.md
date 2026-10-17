@@ -50,6 +50,9 @@ Payment failure creates no ledger entries and marks the attempt/contribution fai
 A new start key can retry. A stale version, lost acceptance, or cancelling/cancelled
 agreement cancels the processing attempt without securing funds. The contribution
 becomes failed, while current agreement/version gates prevent inappropriate retries.
+If cancellation acquires the agreement lock first, it reconciles the persisted
+simulated outcome in its own transaction before creating the cancellation refund;
+see [Stage 2B cancellation](./CANCELLATION.md).
 Cancellation/refund implementation itself remains the next workstream milestone.
 
 Completion returns `ok: true` when the processing operation succeeds, with explicit
@@ -105,15 +108,15 @@ handler must use Valera's verified auth/session setup and a user-scoped client.
 
 The transport interface is hand-authored, not invented generated database types.
 The existing empty `src/types/database.ts` remains unchanged until the official
-Supabase generator can connect. Apply migrations 001–004, generate types, then wire
+Supabase generator can connect. Apply migrations 001–005, generate types, then wire
 the typed Supabase clients at the server composition boundary. No hosted setup is
 assumed. Agreement creation/publication/acceptance RPCs are still separate work;
 local tests provision coherent accepted fixtures through administrator SQL.
 
 ## Local verification and limits
 
-`npm test` runs the complete suite; `npm run test:db` runs migration/integrity/funding
-tests. Coverage includes authorization, unanimous acceptance, processing/due times,
+`npm test` runs the complete suite; `npm run test:db` runs migration, integrity,
+funding and cancellation tests. Coverage includes authorization, unanimous acceptance, processing/due times,
 separate group contributions, balanced postings, deterministic declines/retries,
 same/different-key duplicates, payload conflicts, stale versions, rollback injection,
 bounded workers and cancellation-first/completion-first orderings.

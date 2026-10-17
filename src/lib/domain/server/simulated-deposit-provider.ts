@@ -11,11 +11,12 @@ import { mutationInputSchema, participantIdSchema } from "../validation";
 
 /** Narrow transport boundary until real Supabase database types are generated.
  * Wrap client.rpc(name, { p_input: input }) in the composition root. Do not cast
- * the empty generated Database type or use a privileged client for start().
+ * the empty generated Database type or use a privileged client for user operations.
  */
 export type FundingRpc = (
   name:
     | "start_contribution"
+    | "cancel_agreement"
     | "complete_simulated_contribution"
     | "process_due_contributions",
   args: { p_input: unknown },
@@ -134,6 +135,14 @@ export class SimulatedDepositProvider implements DepositProvider {
     const parsed = startSchema.safeParse(input);
     return parsed.success
       ? invoke(this.userRpc, "start_contribution", parsed.data, startOutput)
+      : failure("validation_failed");
+  }
+  async cancel(
+    input: OperationInput<"cancelAgreement">,
+  ): Promise<OperationResult<OperationOutput<"cancelAgreement">>> {
+    const parsed = mutationInputSchema.safeParse(input);
+    return parsed.success
+      ? invoke(this.userRpc, "cancel_agreement", parsed.data, transitionSchema)
       : failure("validation_failed");
   }
   async complete(

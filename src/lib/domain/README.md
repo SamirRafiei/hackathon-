@@ -66,12 +66,14 @@ capped deduction allocator and settlement engine belong to Stage 2.
 
 ## Integration status
 
-**Stage 2A implements funding start/completion and the due-payment worker.** Import
+**Stage 2A implements funding start/completion and the due-payment worker; Stage 2B
+implements pre-handover cancellation and refunds.** Import
 `SimulatedDepositProvider` from `@/lib/domain/server/simulated-deposit-provider` in
 server code; it is intentionally excluded from the browser-safe barrel. See
-[funding integration](../../../supabase/FUNDING.md). Other operation types remain
-contracts. Do not implement adapters as separate direct Supabase writes or relax
-table grants to bypass the transaction boundary.
+[funding integration](../../../supabase/FUNDING.md) and
+[cancellation integration](../../../supabase/CANCELLATION.md). Other operation types
+remain contracts. Do not implement adapters as separate direct Supabase writes or
+relax table grants to bypass the transaction boundary.
 
 ```ts
 import type { DomainHandler, OperationInput } from "@/lib/domain";

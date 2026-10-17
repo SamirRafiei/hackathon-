@@ -6,8 +6,10 @@ Canonical names and inputs/results are in
 schema integrity and access policies are working implementations.
 
 **Stage 2A update:** `startContribution`, `completeSimulatedContribution` and
-`processDueContributions` are now implemented by migration 004. See
+`processDueContributions` are implemented by migration 004. See
 [FUNDING.md](./FUNDING.md) for grants, payloads, failure fixtures and local test limits.
+**Stage 2B update:** `cancelAgreement` is implemented by migration 005. See
+[CANCELLATION.md](./CANCELLATION.md) for in-flight reconciliation and refund behavior.
 Other operations below remain implementation contracts.
 
 ## Transaction protocol
@@ -39,7 +41,7 @@ and RLS alone cannot enforce complete transition rules.
 | `createInvitation`, `revokeInvitation`, `claimInvitation`             | Owner issues/revokes before funding; high-entropy hashed tokens; expire/revoke outstanding tokens on reissue; matching verified email, live current version and unclaimed slot; generic public landing page                |
 | `proposeAgreementChange`, `acceptAgreementVersion`                    | Borrower proposes; owner/borrowers accept exact current version; owner publishes; everyone must accept before funding                                                                                                      |
 | `startContribution`, `completeSimulatedContribution`                  | Own contribution only; all accepted; persist processing and due time; authorized worker determines result; stale/cancelled completion cannot secure funds; failed retries get new keys                                     |
-| `cancelAgreement`                                                     | Any participant before handover; reconcile processing attempts; refund secured contributions only; final state follows reconciliation/refunds; no unilateral post-handover cancellation                                    |
+| `cancelAgreement`                                                     | Implemented in migration 005: any participant before handover; reconcile processing attempts; refund secured contributions only; atomically finalize cancellation; no unilateral post-handover cancellation                |
 | `prepareCollection`, `createVerificationChallenge`, `confirmHandover` | Fully funded agreement, any borrower, purpose/expiry/attempt limits and hashed proofs, distinct owner/borrower confirmations of submitted evidence/checklist; scanning is not consent                                      |
 | `prepareEvidenceUpload`, `submitEvidence`                             | Authorized participant/assigned reviewer; reserve random path; verify MIME/size/content/hash and stored object; finalize append-only; permit initial claim evidence before dispute creation                                |
 | `requestReturn`, `acknowledgeReturn`                                  | Either side initiates, any borrower supplies evidence; owner alone acknowledges physical receipt/evidence; set exact 24-hour deadline once; optional in-person code or documented remote pending request                   |

@@ -22,20 +22,30 @@ const agreement = {
   inspectionDeadline: null,
 };
 describe("server-only simulated provider", () => {
-  it("uses caller transport only for starting and worker transport only for completion/batches", async () => {
-    const user = vi.fn().mockResolvedValue({
-      error: null,
-      data: {
-        ok: true,
-        replayed: false,
+  it("uses caller transport for user operations and worker transport for completion/batches", async () => {
+    const user = vi
+      .fn()
+      .mockResolvedValueOnce({
+        error: null,
         data: {
-          agreement,
-          operationId: id,
-          attemptId: id,
-          dueAt: "2026-10-17T00:00:02Z",
+          ok: true,
+          replayed: false,
+          data: {
+            agreement,
+            operationId: id,
+            attemptId: id,
+            dueAt: "2026-10-17T00:00:02Z",
+          },
         },
-      },
-    });
+      })
+      .mockResolvedValueOnce({
+        error: null,
+        data: {
+          ok: true,
+          replayed: false,
+          data: { agreement, operationId: id },
+        },
+      });
     const worker = vi
       .fn()
       .mockResolvedValueOnce({
@@ -64,6 +74,20 @@ describe("server-only simulated provider", () => {
     expect(user).toHaveBeenCalledWith("start_contribution", {
       p_input: startInput,
     });
+    expect(
+      await provider.cancel({
+        agreementId: id,
+        expectedRevision: "1",
+        idempotencyKey: "cancel-1",
+      }),
+    ).toMatchObject({ ok: true });
+    expect(user).toHaveBeenLastCalledWith("cancel_agreement", {
+      p_input: {
+        agreementId: id,
+        expectedRevision: "1",
+        idempotencyKey: "cancel-1",
+      },
+    });
     expect(worker).not.toHaveBeenCalled();
     expect(
       await provider.complete({ attemptId: id, idempotencyKey: "done" }),
@@ -75,7 +99,7 @@ describe("server-only simulated provider", () => {
       "complete_simulated_contribution",
       "process_due_contributions",
     ]);
-    expect(user).toHaveBeenCalledTimes(1);
+    expect(user).toHaveBeenCalledTimes(2);
   });
   it("rejects malformed requests without a database call, including nonnumeric revisions", async () => {
     const rpc = vi.fn();
@@ -94,6 +118,16 @@ describe("server-only simulated provider", () => {
     expect(
       await provider.processDue({ batchSize: 101, idempotencyKey: "bad" }),
     ).toMatchObject({ ok: false });
+    expect(
+      await provider.cancel({
+        agreementId: id,
+        expectedRevision: "-1",
+        idempotencyKey: "invalid-cancel",
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: { code: "validation_failed" },
+    });
     expect(rpc).not.toHaveBeenCalled();
   });
   it("returns safe errors without exposing database or transport internals", async () => {

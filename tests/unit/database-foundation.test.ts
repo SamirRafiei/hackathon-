@@ -43,7 +43,8 @@ let db: PGlite;
 type FundingResult = OperationResult<
   OperationOutput<"startContribution"> &
     OperationOutput<"completeSimulatedContribution"> &
-    OperationOutput<"processDueContributions">
+    OperationOutput<"processDueContributions"> &
+    OperationOutput<"cancelAgreement">
 >;
 async function fundingCall(
   name: string,
@@ -89,6 +90,20 @@ async function completeFunding(attemptId: string, key = "complete-1") {
   await db.exec("reset role; set local role service_role");
   return fundingCall("complete_simulated_contribution", {
     attemptId,
+    idempotencyKey: key,
+  });
+}
+async function cancelAgreement(actor = borrower, key = "cancel-1") {
+  await db.exec("reset role");
+  const revision = (
+    await db.query<{ revision: string }>(
+      `select revision::text from public.agreements where id='${agreement}'`,
+    )
+  ).rows[0].revision;
+  await asUser(actor);
+  return fundingCall("cancel_agreement", {
+    agreementId: agreement,
+    expectedRevision: revision,
     idempotencyKey: key,
   });
 }
@@ -596,7 +611,7 @@ describe("database integrity", () => {
   });
 });
 
-describe("Stage 2A simulated funding", () => {
+describe("Stage 2 funding and cancellation", () => {
   it("cancels a processing attempt if its accepted version is superseded", async () => {
     await readyFunding();
     const started = successful(await startFunding());
@@ -670,6 +685,335 @@ describe("Stage 2A simulated funding", () => {
     expect(await startFunding()).toMatchObject({
       ok: false,
       error: { code: "acceptances_required" },
+    });
+  });
+
+  describe("Stage 2B cancellation and refunds", () => {
+    it("authorizes any participant, rejects strangers and forbids cancellation after handover", async () => {
+      await readyFunding();
+      expect(await cancelAgreement(stranger)).toMatchObject({
+        ok: false,
+        error: { code: "not_authorized" },
+      });
+      await db.exec(`reset role;
+        update public.agreements set state='active',handover_at=now() where id='${agreement}'`);
+      expect(
+        await cancelAgreement(secondBorrower, "after-handover"),
+      ).toMatchObject({
+        ok: false,
+        error: { code: "invalid_state" },
+      });
+      await db.exec("reset role");
+      expect(await count("settlements")).toBe(0);
+    });
+
+    it("cancels with zero secured funds without inventing refunds or ledger entries", async () => {
+      const result = successful(await cancelAgreement(owner));
+      expect(result.agreement.state).toBe("cancelled");
+      await db.exec("reset role; set constraints all immediate");
+      expect(
+        (
+          await db.query(
+            "select reason,secured_minor,owner_minor,refunded_minor from public.settlements",
+          )
+        ).rows,
+      ).toEqual([
+        {
+          reason: "cancellation",
+          secured_minor: 0,
+          owner_minor: 0,
+          refunded_minor: 0,
+        },
+      ]);
+      expect(await count("settlement_allocations")).toBe(0);
+      expect(await count("ledger_transactions")).toBe(0);
+      expect(await count("ledger_entries")).toBe(0);
+      expect(
+        (
+          await db.query(
+            "select state,secured_minor,refunded_minor from public.contributions order by id",
+          )
+        ).rows,
+      ).toEqual([
+        { state: "awaiting_payment", secured_minor: 0, refunded_minor: 0 },
+        { state: "awaiting_payment", secured_minor: 0, refunded_minor: 0 },
+      ]);
+    });
+
+    it("refunds only secured borrower contributions in a partially funded group", async () => {
+      await readyFunding();
+      const started = successful(await startFunding());
+      await waitForDue();
+      expect(
+        successful(await completeFunding(started.attemptId)).attemptState,
+      ).toBe("succeeded");
+      expect(
+        successful(await cancelAgreement(secondBorrower)).agreement.state,
+      ).toBe("cancelled");
+      await db.exec("reset role; set constraints all immediate");
+      expect(
+        (
+          await db.query(
+            "select secured_minor,owner_minor,refunded_minor from public.settlements",
+          )
+        ).rows,
+      ).toEqual([
+        { secured_minor: 15000, owner_minor: 0, refunded_minor: 15000 },
+      ]);
+      expect(
+        (
+          await db.query(
+            "select c.id,c.state,c.secured_minor,c.refunded_minor from public.contributions c order by c.id",
+          )
+        ).rows,
+      ).toEqual([
+        {
+          id: contribution,
+          state: "refunded",
+          secured_minor: 15000,
+          refunded_minor: 15000,
+        },
+        {
+          id: secondContribution,
+          state: "awaiting_payment",
+          secured_minor: 0,
+          refunded_minor: 0,
+        },
+      ]);
+      expect(
+        (
+          await db.query(
+            "select contribution_id,secured_minor,refunded_minor from public.settlement_allocations",
+          )
+        ).rows,
+      ).toEqual([
+        {
+          contribution_id: contribution,
+          secured_minor: 15000,
+          refunded_minor: 15000,
+        },
+      ]);
+      expect(await count("ledger_entries")).toBe(4);
+      expect(
+        (
+          await db.query(
+            "select sum(amount_minor)::integer as balance from public.ledger_entries where account='restricted_deposit'",
+          )
+        ).rows,
+      ).toEqual([{ balance: 0 }]);
+    });
+
+    it("reconciles in-flight success before refunding and replays cancellation idempotently", async () => {
+      await readyFunding();
+      const started = successful(await startFunding());
+      await db.exec("reset role");
+      const revision = (
+        await db.query<{ revision: string }>(
+          `select revision::text from public.agreements where id='${agreement}'`,
+        )
+      ).rows[0].revision;
+      const input = {
+        agreementId: agreement,
+        expectedRevision: revision,
+        idempotencyKey: "in-flight-cancel",
+      };
+      await asUser(owner);
+      const first = await fundingCall("cancel_agreement", input);
+      expect(successful(first).agreement.state).toBe("cancelled");
+      expect(await fundingCall("cancel_agreement", input)).toEqual({
+        ...first,
+        replayed: true,
+      });
+      expect(
+        await completeFunding(started.attemptId, "complete-after-cancel"),
+      ).toMatchObject({
+        ok: false,
+        error: { code: "already_processed" },
+      });
+      await db.exec("reset role; set constraints all immediate");
+      expect(
+        (
+          await db.query(
+            `select p.state as attempt_state,c.state as contribution_state,c.secured_minor,c.refunded_minor
+             from public.payment_attempts p join public.contributions c on c.id=p.contribution_id
+             where p.id='${started.attemptId}'`,
+          )
+        ).rows,
+      ).toEqual([
+        {
+          attempt_state: "succeeded",
+          contribution_state: "refunded",
+          secured_minor: 15000,
+          refunded_minor: 15000,
+        },
+      ]);
+      expect(await count("ledger_transactions")).toBe(2);
+      expect(await count("ledger_entries")).toBe(4);
+      expect(await count("settlements")).toBe(1);
+    });
+
+    it("reconciles a failed in-flight attempt without refunding it", async () => {
+      await readyFunding();
+      await db.exec(
+        `insert into pact_private.simulated_failure_fixtures values ('${contribution}',1)`,
+      );
+      const started = successful(await startFunding());
+      expect(successful(await cancelAgreement()).agreement.state).toBe(
+        "cancelled",
+      );
+      await db.exec("reset role; set constraints all immediate");
+      expect(
+        (
+          await db.query(
+            `select p.state as attempt_state,c.state as contribution_state,c.secured_minor,c.refunded_minor
+             from public.payment_attempts p join public.contributions c on c.id=p.contribution_id
+             where p.id='${started.attemptId}'`,
+          )
+        ).rows,
+      ).toEqual([
+        {
+          attempt_state: "failed",
+          contribution_state: "failed",
+          secured_minor: 0,
+          refunded_minor: 0,
+        },
+      ]);
+      expect(await count("settlement_allocations")).toBe(0);
+      expect(await count("ledger_transactions")).toBe(0);
+      expect(await count("ledger_entries")).toBe(0);
+    });
+
+    it("reconciles every pending borrower attempt before refunding secured outcomes", async () => {
+      await readyFunding();
+      await db.exec(
+        `insert into pact_private.simulated_failure_fixtures values ('${secondContribution}',1)`,
+      );
+      const succeeded = successful(await startFunding());
+      const failed = successful(
+        await startFunding(
+          secondBorrower,
+          secondContribution,
+          "second-pending",
+        ),
+      );
+      expect(successful(await cancelAgreement()).agreement.state).toBe(
+        "cancelled",
+      );
+      await db.exec("reset role; set constraints all immediate");
+      expect(
+        (
+          await db.query(
+            `select p.id,p.state as attempt_state,c.state as contribution_state,c.secured_minor,c.refunded_minor
+             from public.payment_attempts p join public.contributions c on c.id=p.contribution_id order by c.id`,
+          )
+        ).rows,
+      ).toEqual([
+        {
+          id: succeeded.attemptId,
+          attempt_state: "succeeded",
+          contribution_state: "refunded",
+          secured_minor: 15000,
+          refunded_minor: 15000,
+        },
+        {
+          id: failed.attemptId,
+          attempt_state: "failed",
+          contribution_state: "failed",
+          secured_minor: 0,
+          refunded_minor: 0,
+        },
+      ]);
+      expect(
+        (
+          await db.query(
+            "select secured_minor,refunded_minor from public.settlements",
+          )
+        ).rows,
+      ).toEqual([{ secured_minor: 15000, refunded_minor: 15000 }]);
+      expect(await count("settlement_allocations")).toBe(1);
+      expect(await count("ledger_transactions")).toBe(2);
+      expect(await count("ledger_entries")).toBe(4);
+    });
+
+    it("rejects stale revisions and changed-key payloads without duplicate refunds", async () => {
+      await readyFunding();
+      const started = successful(await startFunding());
+      await waitForDue();
+      successful(await completeFunding(started.attemptId));
+      await db.exec("reset role");
+      const revision = (
+        await db.query<{ revision: string }>(
+          `select revision::text from public.agreements where id='${agreement}'`,
+        )
+      ).rows[0].revision;
+      await asUser(owner);
+      const input = {
+        agreementId: agreement,
+        expectedRevision: revision,
+        idempotencyKey: "cancel-once",
+      };
+      const first = await fundingCall("cancel_agreement", input);
+      expect(
+        await fundingCall("cancel_agreement", {
+          ...input,
+          expectedRevision: (BigInt(revision) - BigInt(1)).toString(),
+        }),
+      ).toMatchObject({ ok: false, error: { code: "idempotency_conflict" } });
+      expect(
+        await fundingCall("cancel_agreement", {
+          ...input,
+          idempotencyKey: "cancel-again",
+        }),
+      ).toMatchObject({ ok: false, error: { code: "already_processed" } });
+      expect(successful(first).agreement.state).toBe("cancelled");
+      await db.exec("reset role");
+      expect(await count("settlements")).toBe(1);
+      expect(await count("ledger_entries")).toBe(4);
+    });
+
+    it("rolls back reconciliation, refunds, settlement and state when audit persistence fails", async () => {
+      await readyFunding();
+      const started = successful(await startFunding());
+      await db.exec(`reset role;
+        create function pg_temp.fail_cancellation_audit() returns trigger language plpgsql as $$ begin
+          if new.action='agreement_cancelled' then raise exception 'private_audit_failure'; end if; return new; end $$;
+        create trigger test_cancellation_audit before insert on public.audit_events
+          for each row execute function pg_temp.fail_cancellation_audit();`);
+      const revision = (
+        await db.query<{ revision: string }>(
+          `select revision::text from public.agreements where id='${agreement}'`,
+        )
+      ).rows[0].revision;
+      await asUser(owner);
+      await rejected(
+        `select public.cancel_agreement('{"agreementId":"${agreement}","expectedRevision":"${revision}","idempotencyKey":"rollback-cancel"}'::jsonb)`,
+        "private_audit_failure",
+      );
+      await db.exec("reset role");
+      expect(await count("settlements")).toBe(0);
+      expect(await count("ledger_transactions")).toBe(0);
+      expect(await count("ledger_entries")).toBe(0);
+      expect(
+        (
+          await db.query(
+            `select state,secured_minor,refunded_minor from public.contributions where id='${contribution}'`,
+          )
+        ).rows,
+      ).toEqual([{ state: "processing", secured_minor: 0, refunded_minor: 0 }]);
+      expect(
+        (
+          await db.query(
+            `select state from public.payment_attempts where id='${started.attemptId}'`,
+          )
+        ).rows,
+      ).toEqual([{ state: "processing" }]);
+      expect(
+        (
+          await db.query(
+            `select state from public.agreements where id='${agreement}'`,
+          )
+        ).rows,
+      ).toEqual([{ state: "awaiting_funding" }]);
     });
   });
   it("rejects unclaimed, changed, or unverified snapshot membership", async () => {

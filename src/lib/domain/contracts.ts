@@ -70,7 +70,7 @@ export interface EvidenceInput {
 }
 type Operation<I, O> = { input: I; output: O };
 
-/** Domain contract map. See supabase/FUNDING.md for the implemented funding RPCs.
+/** Domain contract map. See supabase/FUNDING.md and CANCELLATION.md for implemented RPCs.
  * Implementers obtain identity from verified auth, not input. Every authoritative
  * transition must call ONE authorized database transaction.
  */
@@ -217,6 +217,9 @@ export interface DepositProvider {
   start(
     input: OperationInput<"startContribution">,
   ): Promise<OperationResult<OperationOutput<"startContribution">>>;
+  cancel(
+    input: OperationInput<"cancelAgreement">,
+  ): Promise<OperationResult<OperationOutput<"cancelAgreement">>>;
   complete(
     input: OperationInput<"completeSimulatedContribution">,
   ): Promise<OperationResult<OperationOutput<"completeSimulatedContribution">>>;
