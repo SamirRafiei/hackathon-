@@ -388,7 +388,6 @@ export function declineSplit(
   let agreement: DemoAgreement = {
     ...snapshot.agreement,
     status: "RETURN_REVIEW",
-    proposal: null,
   };
   agreement = recordActivity(
     agreement,
