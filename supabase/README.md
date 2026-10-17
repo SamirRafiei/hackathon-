@@ -1,7 +1,24 @@
 # Database workspace
 
-`config.toml` configures local Supabase only. The initial migration defines the participant-scoped agreement and simulated-ledger schema with read-only browser access. It is a persistence foundation, not a complete backend: authenticated transactional operations must be implemented before connecting the app to these tables. `seed.sql` is intentionally empty of product data.
+Schema v1, integrity triggers, RLS and private Storage policies are implemented in
+ordered [migrations](./migrations/). Read [SCHEMA.md](./SCHEMA.md) for the entity map,
+permissions, defaults, migration commands and verification limits. Read
+[OPERATIONS.md](./OPERATIONS.md) for the contract handoff and required atomic RPCs.
 
-The migration has not been applied to a local or hosted database. Start locally with Docker and `npm run db:start`, then review and apply it before generating `src/types/database.ts`. No hosted project has been provisioned, linked, or changed.
+`config.toml` remains local Supabase configuration. `seed.sql` remains free of
+product data and credentials. No hosted project has been provisioned, linked or
+modified. The security-deposit return-review window is 48 hours; invitation and
+negotiation deadlines may be 24 hours as described in the operations documents.
+The migrations add [simulated funding RPCs and a bounded worker](./FUNDING.md)
+plus [atomic pre-handover cancellation and refunds](./CANCELLATION.md). The worker
+is a callable database operation, not a deployed schedule. Other workflow RPCs
+and scheduled deployment remain pending.
 
-Evidence storage policies, transactional mutation functions, reviewer grants, and deadline jobs still need implementation. Do not assume generated local defaults enforce Pact's participant or reviewer permissions.
+Run `npm test` or `npm run test:db` for executable embedded PostgreSQL verification
+without Docker. PGlite does not replace hosted Supabase tests or prove true
+concurrent behavior. The interactive demo does not call these migrations or RPCs;
+server identity verification, application route wiring, the remaining lifecycle
+operations, and production worker scheduling are not implemented. With the actual
+local Supabase stack running, apply migrations and run `npm run db:types`. The
+generated types file remains unchanged until the official generator succeeds
+against a real Supabase database.

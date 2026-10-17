@@ -72,7 +72,7 @@ const entrySchema = z.object({
     "renter_refund",
     "landlord_allocation",
   ]),
-  amountMinor: z.number().int(),
+  amountMinor: z.number().safe().int(),
   currency: z.literal(DEMO_CURRENCY),
   createdAt: z.string(),
 });
@@ -93,32 +93,182 @@ const proposalSchema = z.object({
   tenantApproved: z.boolean(),
 });
 
-export const demoSnapshotSchema = z.object({
-  activeActorId: z.enum(["demo-landlord", "demo-tenant"]),
-  agreement: z.object({
-    id: z.string(),
-    title: z.string(),
-    address: z.string(),
-    startDate: z.string(),
-    endDate: z.string(),
-    termsVersion: z.number().int().positive(),
-    amountMinor: z.number().int().positive(),
-    currency: z.literal(DEMO_CURRENCY),
-    status: z.enum([
-      "AWAITING_ACCEPTANCE",
-      "AWAITING_FUNDING",
+export const demoSnapshotSchema = z
+  .object({
+    activeActorId: z.enum(["demo-landlord", "demo-tenant"]),
+    agreement: z.object({
+      id: z.string(),
+      title: z.string(),
+      address: z.string(),
+      startDate: z.string(),
+      endDate: z.string(),
+      termsVersion: z.number().int().positive(),
+      amountMinor: z.number().safe().int().positive(),
+      currency: z.literal(DEMO_CURRENCY),
+      status: z.enum([
+        "AWAITING_ACCEPTANCE",
+        "AWAITING_FUNDING",
+        "FUNDED",
+        "RETURN_REVIEW",
+        "PROPOSAL_PENDING",
+        "COMPLETED",
+      ]),
+      acceptedBy: z.object({ landlord: z.boolean(), tenant: z.boolean() }),
+      reservedMinor: z.number().safe().int().nonnegative(),
+      proposal: proposalSchema.nullable(),
+      ledger: z.array(entrySchema),
+      activity: z.array(activitySchema),
+    }),
+  })
+  .superRefine(({ agreement }, context) => {
+    const { amountMinor, reservedMinor, status, acceptedBy, proposal, ledger } =
+      agreement;
+
+    if (reservedMinor > amountMinor) {
+      context.addIssue({
+        code: "custom",
+        path: ["agreement", "reservedMinor"],
+        message: "Reserved funds cannot exceed the agreement amount.",
+      });
+    }
+
+    const operationTotals = new Map<string, number>();
+    const accountTotals = new Map<LedgerEntry["account"], number>();
+    let reservedLedgerBalance = 0;
+    let ledgerTotal = 0;
+    for (const entry of ledger) {
+      operationTotals.set(
+        entry.operationId,
+        (operationTotals.get(entry.operationId) ?? 0) + entry.amountMinor,
+      );
+      accountTotals.set(
+        entry.account,
+        (accountTotals.get(entry.account) ?? 0) + entry.amountMinor,
+      );
+      ledgerTotal += entry.amountMinor;
+      if (entry.account === "agreement_reserved") {
+        reservedLedgerBalance += entry.amountMinor;
+      }
+    }
+
+    if (
+      ledgerTotal !== 0 ||
+      [...operationTotals.values()].some((total) => total !== 0)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["agreement", "ledger"],
+        message: "Ledger entries must balance overall and per operation.",
+      });
+    }
+    if (reservedLedgerBalance !== reservedMinor) {
+      context.addIssue({
+        code: "custom",
+        path: ["agreement", "reservedMinor"],
+        message: "Reserved funds must match the ledger balance.",
+      });
+    }
+
+    const hasFunding = [
       "FUNDED",
       "RETURN_REVIEW",
       "PROPOSAL_PENDING",
       "COMPLETED",
-    ]),
-    acceptedBy: z.object({ landlord: z.boolean(), tenant: z.boolean() }),
-    reservedMinor: z.number().int().nonnegative(),
-    proposal: proposalSchema.nullable(),
-    ledger: z.array(entrySchema),
-    activity: z.array(activitySchema),
-  }),
-});
+    ].includes(status);
+    const tenantAvailableTotal = accountTotals.get("renter_available") ?? 0;
+    const refundTotal = accountTotals.get("renter_refund") ?? 0;
+    const ownerAllocationTotal = accountTotals.get("landlord_allocation") ?? 0;
+    if (
+      (hasFunding && tenantAvailableTotal !== -amountMinor) ||
+      (!hasFunding && tenantAvailableTotal !== 0) ||
+      refundTotal < 0 ||
+      ownerAllocationTotal < 0 ||
+      refundTotal + ownerAllocationTotal + reservedMinor !==
+        (hasFunding ? amountMinor : 0)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["agreement", "ledger"],
+        message: "Ledger account totals do not match the agreement lifecycle.",
+      });
+    }
+
+    if (
+      status === "AWAITING_FUNDING" &&
+      !(acceptedBy.landlord && acceptedBy.tenant)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["agreement", "acceptedBy"],
+        message: "Both parties must accept before funding.",
+      });
+    }
+
+    if (
+      ["FUNDED", "RETURN_REVIEW", "PROPOSAL_PENDING", "COMPLETED"].includes(
+        status,
+      ) &&
+      !(acceptedBy.landlord && acceptedBy.tenant)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["agreement", "acceptedBy"],
+        message: "A funded agreement must have both parties' acceptance.",
+      });
+    }
+
+    if (
+      ["FUNDED", "RETURN_REVIEW", "PROPOSAL_PENDING"].includes(status) &&
+      reservedMinor === 0
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["agreement", "reservedMinor"],
+        message: "An unsettled funded agreement must have reserved funds.",
+      });
+    }
+
+    if (
+      status === "PROPOSAL_PENDING" &&
+      (!proposal || proposal.tenantApproved)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["agreement", "proposal"],
+        message: "A pending proposal must await tenant approval.",
+      });
+    }
+
+    if (status === "COMPLETED" && reservedMinor !== 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["agreement", "reservedMinor"],
+        message: "A completed agreement cannot retain reserved funds.",
+      });
+    }
+
+    if (proposal) {
+      const expectedTotal =
+        status === "COMPLETED" ? amountMinor : reservedMinor;
+      if (
+        proposal.ownerAllocationMinor + proposal.renterRefundMinor !==
+        expectedTotal
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["agreement", "proposal"],
+          message: "Proposal allocations must equal the amount being settled.",
+        });
+      }
+      if (status === "COMPLETED" && !proposal.tenantApproved) {
+        context.addIssue({
+          code: "custom",
+          path: ["agreement", "proposal", "tenantApproved"],
+          message: "A split can only be completed after tenant approval.",
+        });
+      }
+    }
+  });
 
 const fixtureTime = "2026-10-17T09:00:00.000Z";
 

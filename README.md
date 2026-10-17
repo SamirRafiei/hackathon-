@@ -6,6 +6,8 @@ Pact is a prototype for making rental deposits easier to understand and settle f
 
 The idea can fit inside a banking app or another trusted host experience. This standalone prototype has no banking-provider integration and does not hold, move, or protect real money.
 
+The repository also contains a backend foundation from `feat/core-ledger`: validated domain contracts, PostgreSQL migrations, access/storage policies, and simulated funding/cancellation operations. These are not connected to the interactive demo yet.
+
 ## Start locally
 
 Use Node.js 22.12+ on the 22.x line, or a supported even-numbered LTS release (24+), with npm. Use the committed `package-lock.json`; do not introduce another package manager's lockfile.
@@ -20,7 +22,7 @@ npm run dev
 
 Open http://localhost:3000. The demo works without Docker, Supabase credentials, or an account. Use the landlord/tenant switcher to walk through the same seeded agreement. Demo choices and activity are saved in that browser's local storage, so two different browsers do not share data.
 
-This identity switch is a demo control, not sign-in or proof of identity. Anyone can switch between the fake parties. Do not use real personal information or money. Future host-app integration must verify a signed identity assertion on the server; a browser-provided name, role, or biometric claim is not sufficient. The Supabase factories remain unused by this demo; the migration is not applied, and authenticated server-side financial operations are still needed.
+This identity switch is a demo control, not sign-in or proof of identity. Anyone can switch between the fake parties. Do not use real personal information or money. Future host-app integration must verify a signed identity assertion on the server; a browser-provided name, role, or biometric claim is not sufficient. The Supabase factories and database operations remain unused by this demo. Migrations are not applied to a local or hosted database, and server authorization/route wiring remains future work.
 
 ## Project structure
 
@@ -30,20 +32,20 @@ src/
   components/ui/       Shared accessible UI components
   features/
     demo/               Seeded agreement, local demo repository, interactive workflow
-    agreements/        Future creation, revisions, invitations, acceptance
-    deposits/          Future provider, persistent funding, transaction history
+    agreements/        Reserved for future creation, revisions, invitations, acceptance
+    deposits/          Reserved for future provider, persistent funding, transaction history
     handover/          Condition evidence, QR/code, collection, return
     disputes/          Claims, negotiation, reviewer workspace
   lib/
     auth/              Identity-provider boundary; current fake demo identities
-    domain/            Future shared schemas and operation contracts
+    domain/            Shared validation, agreement contracts, allocation and provider boundary
     supabase/          Browser and server client factories
     env.ts             Lazy public Supabase environment validation
     utils.ts           Tailwind-aware class name helper
   types/database.ts    Empty generated-schema placeholder
-supabase/              Local configuration and initial schema migration
+supabase/              Local configuration, ordered schema/access/operation migrations and docs
 scripts/               Database type-generation utility
-tests/unit/            Future focused domain/component tests
+tests/unit/            Demo, domain, simulated provider and embedded PostgreSQL tests
 tests/e2e/             Future Playwright transaction journeys
 public/                Static assets
 ```
@@ -62,7 +64,7 @@ The demo domain transitions are kept separate from the UI and persisted through 
 | Forms      | React Hook Form, Zod, `@hookform/resolvers`                                                              |
 | QR         | `qrcode` (generation), `html5-qrcode` (camera/file scanning)                                             |
 | Dates      | `date-fns`                                                                                               |
-| Quality    | Biome linting, Prettier with Tailwind ordering, Vitest, Testing Library, jsdom, Playwright               |
+| Quality    | Biome linting, Prettier with Tailwind ordering, Vitest, PGlite, Testing Library, jsdom, Playwright       |
 
 The interactive demo uses the Next.js App Router, React client state, Zod to validate saved demo data, and browser local storage. Load scanner/QR and other browser-heavy packages only in features that need them. No external font request is needed. Development and production builds explicitly use Webpack for this Windows setup.
 
@@ -76,6 +78,7 @@ The interactive demo uses the Next.js App Router, React client state, Zod to val
 | `npm run typecheck`                            | Generate route types and check TypeScript             |
 | `npm run format` / `npm run format:check`      | Format / verify formatting (`plan.md` excluded)       |
 | `npm test` / `npm run test:watch`              | Vitest run / watch                                    |
+| `npm run test:db`                              | Embedded PostgreSQL migration and policy tests        |
 | `npm run test:e2e` / `npm run test:e2e:ui`     | Playwright journeys / interactive runner              |
 | `npm run check`                                | Lint, types, formatting, unit tests, production build |
 | `npm run db:start` / `npm run db:stop`         | Start / stop local Supabase (requires Docker)         |
@@ -84,7 +87,7 @@ The interactive demo uses the Next.js App Router, React client state, Zod to val
 | `npm run db:types`                             | Generate types from running local Supabase            |
 | `npm run db:types -- --project-id PROJECT_REF` | Generate types from an authorized hosted project      |
 
-Vitest and Playwright are configured, but **no product tests exist yet**. Vitest permits an empty suite for this scaffold; remove `--passWithNoTests` once meaningful tests land. Playwright reports no tests until the team adds journeys. Before running the first browser test, install Chromium with `npx playwright install chromium` (on Linux CI use `--with-deps`). GitHub Actions currently runs `npm run check`, not browser tests.
+Vitest covers the simulated agreement lifecycle, domain rules and local-storage repository. `npm run test:db` applies the migrations in embedded PGlite and checks database constraints/policies. PGlite is useful for SQL regression checks but does not establish hosted Supabase behavior, true concurrent transaction safety, server authorization, or real money movement. Playwright is configured, but there are no browser journeys yet. Before running the first browser test, install Chromium with `npx playwright install chromium` (on Linux CI use `--with-deps`). GitHub Actions currently runs `npm run check`, not browser tests.
 
 ## Supabase workflow
 
@@ -99,15 +102,16 @@ npm run db:types
 
 For an existing hosted project, authenticate with `npx supabase login` and generate types using the project reference command above. The project ID flag is explicit; the script does not load `.env.local`. Review and apply migrations only to a project you are authorized to change.
 
-The first migration defines participant-readable agreement, version, acceptance, dispute, proposal, ledger, and audit tables. It has not been applied, and browser writes are intentionally denied until authenticated transactional operations exist. There are no storage buckets, reviewer grants, cron jobs, or real seed users. `src/types/database.ts` remains an empty placeholder until the migration is applied and types are generated. The current agreement is a local fixture and is not shared between browsers. Use Docker only if you choose to run the local Supabase stack.
+The migrations define agreement/version, acceptance, evidence, dispute, ledger and audit tables, integrity constraints, participant access, private evidence storage, simulated funding and pre-handover cancellation/refund operations. They have not been applied to a Supabase instance, and the browser demo does not call them. Host identity verification, authenticated route/RPC wiring for the full workflow, scheduled deadline processing, hosted reviewer setup, and generated database types remain incomplete. `src/types/database.ts` is still a placeholder. The current agreement remains a local fixture and is not shared between browsers. Use Docker only if you choose to run the local Supabase stack; the app and embedded database tests do not need Docker.
 
 ## Next implementation steps
 
 1. Keep the current demo provider and local repository restricted to fake data.
-2. Implement a host-identity verifier and authorized server operations before using real accounts.
-3. Apply the initial migration locally, then generate database types and add transaction functions.
-4. Add focused access-control and ledger tests before connecting a persistent repository.
-5. Do not commit local credentials or screenshots containing secrets.
+2. Complete authorized server operations and host-identity verification before using real accounts.
+3. Apply the migrations to a disposable Supabase project, review behavior, and generate database types.
+4. Implement the missing agreement lifecycle operations and connect the UI through server routes.
+5. Add hosted/concurrent access and deadline-worker checks before connecting real users or money.
+6. Do not commit local credentials or screenshots containing secrets.
 
 Vercel can use its standard Next.js preset and the repository root. Add the public environment values when backend features are enabled. Deployment, Supabase provisioning, and GitHub branch creation are not performed by this scaffold.
 
