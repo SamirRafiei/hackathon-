@@ -46,7 +46,7 @@ src/
 supabase/              Local configuration, ordered schema/access/operation migrations and docs
 scripts/               Database type-generation utility
 tests/unit/            Demo, domain, simulated provider and embedded PostgreSQL tests
-tests/e2e/             Playwright configuration for future browser journeys
+tests/e2e/             Playwright handover/evidence browser checks
 public/                Static assets
 ```
 
@@ -101,7 +101,7 @@ The interactive demo uses the Next.js App Router, React client state, Zod to val
 | `npm run db:types`                             | Generate types from running local Supabase            |
 | `npm run db:types -- --project-id PROJECT_REF` | Generate types from an authorized hosted project      |
 
-Vitest covers simulated agreement setup, acceptance/lifecycle, form validation, domain rules and local-storage persistence. `npm run test:db` applies the migrations in embedded PGlite and checks database constraints/policies. PGlite is useful for SQL regression checks but does not establish hosted Supabase behavior, true concurrent transaction safety, server authorization, or real money movement. Playwright is configured, but there are no browser journeys yet. Before running the first browser test, install Chromium with `npx playwright install chromium` (on Linux CI use `--with-deps`). GitHub Actions currently runs `npm run check`, not browser tests.
+Vitest covers simulated agreement setup, acceptance/lifecycle, form validation, domain rules and local-storage persistence. `npm run test:db` applies the migrations in embedded PGlite and checks database constraints/policies. PGlite is useful for SQL regression checks but does not establish hosted Supabase behavior, true concurrent transaction safety, server authorization, or real money movement. Playwright now includes six local handover/evidence checks for photo reload, consent, comparison, phone-width layout and recovery. Run `npx playwright test tests/e2e/handover-evidence.spec.ts --workers=1`; the checks use `localhost:3000` to match the development origin. Complete settlement journeys and final deployed-origin verification remain release work. Fake sample images and reset/checklist instructions are in [the handover runbook](./docs/demo/handover-runbook.md). Before running the first browser test, install Chromium with `npx playwright install chromium` (on Linux CI use `--with-deps`). GitHub Actions currently runs `npm run check`, not browser tests.
 
 ## Supabase workflow
 

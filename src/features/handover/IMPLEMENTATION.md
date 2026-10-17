@@ -2,7 +2,7 @@
 
 Owner: Tayma AlDabbas. Coordination and shared contracts: main implementation agent.
 
-Follow the current `plan.md`: one owner/renter, 48-hour security review from the first renter return declaration, QR deferred. No product/payment scope is changed by this workstream.
+Follow the current `plan.md`: one owner/renter, local apartment/equipment demo, a fixed displayed 48-hour security review from the first renter return declaration, explicit approval for settlement and QR deferred. Server automation and authenticated upload expansion are post-demo work. No product/payment scope is changed by this workstream.
 
 | Module        | Scope                                                                  | Status                          |
 | ------------- | ---------------------------------------------------------------------- | ------------------------------- |
@@ -26,7 +26,24 @@ This completes the download endpoint, not the entire evidence gateway. Upload pr
 
 Validation for this checkpoint: all 229 tests passed across 20 files, including the new download tests and existing embedded database access tests. TypeScript, lint, formatting, production build and diff whitespace checks passed. No hosted Storage or independent-browser integration was exercised.
 
-## Backend handoff
+## Demo verification checkpoint — Tayma AlDabbas, 17 October 2026
+
+T1–T3 are complete for local Chromium; the image recovery defect found during verification also completes T4. This is local evidence, not final hosted-origin or independent-user verification.
+
+- Added four original, clearly labelled synthetic PNG condition images under `public/demo-evidence/`: unchanged apartment wall mark/keys and camera baseline/return with a case scuff. Each is 960 × 640 and under 50 KB. The reproducible generator is `scripts/generate-demo-evidence.mjs`; it renders original vector illustrations locally without external assets.
+- The [handover runbook](../../../docs/demo/handover-runbook.md) supplies exact notes, checklists, captions, files, reset/rebuild procedure and handoffs for Aiperi and Hayk. It explains that unpublished drafts may need re-uploading, submitted files cannot be replaced and clearing/replacing demo agreements does not synchronize browsers.
+- Six browser checks in `tests/e2e/handover-evidence.spec.ts` pass: apartment and equipment at 1280 px and 390 px; new-baseline-version consent; corrupt submitted image recovery. They use real IndexedDB file blobs, normal UI uploads, owner/renter switching and reloads, not injected agreement snapshots.
+- Checked owner-only baseline publication stays `FUNDED`; acknowledgement of the current version activates; no return form exists before activation; the first submitted return fixes exactly 48 hours; viewing/reloading/actor switching cannot move the deadline or release funds. Existing domain/UI tests additionally reject stale acknowledgements and mismatched comparison records.
+- Uploaded images decode after reload in baseline, return and before/after views. Phone-width panels have no horizontal overflow; baseline checkboxes, acknowledgement, view switching, publication and return submission accept keyboard activation. This is a keyboard smoke check, not a full accessibility certification or physical-device camera test.
+- Found and fixed a real preview gap: image decode failures previously left a broken image without recovery. Errors now identify the filename, expose retry, and explain draft re-upload versus resetting a fake demo when submitted local bytes are irrecoverable. Preview failures/retries do not mutate the condition record or consent. Two unit regressions cover decode failure and missing draft recovery.
+
+Next.js development verification used `localhost:3000`, matching the running server origin; its development handshake was blocked at `127.0.0.1`. Browser tests wait for the saved-demo loading state to finish before interacting. No application origin/security settings were relaxed. Browser screenshots in ignored `test-results/` were visually reviewed, including the 390 px equipment comparison.
+
+Full settlement browser journeys, deployment smoke checks and the final rehearsal remain Hayk's release tasks. Authenticated uploads, server baselines/returns and scheduled refunds remain deferred.
+
+Validation: `npm run check` passed (231 unit/component/database tests, lint, TypeScript, formatting and production build), plus all six Chromium evidence browser checks. Document links and diff whitespace checks passed. The mobile comparison screenshots were reviewed; physical-device capture and final hosted-origin checks remain unverified.
+
+## Post-demo backend handoff
 
 - Sameer/Valera coordination: implement authenticated gateway preparation/finalization/draft-removal operations and compose them with `signedEvidenceDownload`. UI `baseline` corresponds to the existing SQL/domain `collection` evidence phase; explicitly translate that phase and return server-allocated private paths. Arrival needs an agreed schema extension. Never trust browser paths or actor IDs.
 - Sameer: provide authoritative baseline version/acknowledgment and return-declaration transactions with server timestamps. Browser models are not authority; the local deadline is displayed but does not run automatic refunds.

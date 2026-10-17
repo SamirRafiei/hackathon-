@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { EvidencePreview } from "@/features/handover/evidence/evidence-preview";
 import { EvidenceUploader } from "@/features/handover/evidence/evidence-uploader";
@@ -34,6 +34,34 @@ function storage(): EvidenceStorage {
   };
 }
 describe("private evidence controls", () => {
+  it("offers recoverable errors for image decode failures and does not change submitted evidence", async () => {
+    const adapter = storage();
+    const submitted = { ...file, submittedAt: "2026-10-17T12:00:00Z" };
+    render(<EvidencePreview file={submitted} storage={adapter} />);
+    fireEvent.error(await screen.findByAltText("Before handover"));
+    expect(screen.getByRole("alert")).toHaveTextContent("photo.png");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "This image could not be displayed",
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "submitted evidence cannot be replaced",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry preview" }));
+    await screen.findByAltText("Before handover");
+    expect(adapter.getUrl).toHaveBeenCalledTimes(2);
+    expect(adapter.finalize).not.toHaveBeenCalled();
+    expect(adapter.remove).not.toHaveBeenCalled();
+  });
+  it("identifies missing draft files and tells the presenter how to re-upload", async () => {
+    const adapter = storage();
+    adapter.getUrl = vi.fn().mockRejectedValue(new Error("Local file missing"));
+    render(<EvidencePreview file={file} storage={adapter} />);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("photo.png");
+    expect(alert).toHaveTextContent(
+      "remove this draft and upload the original file again",
+    );
+  });
   it("releases temporary preview URLs on unmount", async () => {
     const release = vi.fn();
     const adapter = storage();

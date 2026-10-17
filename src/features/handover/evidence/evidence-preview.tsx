@@ -39,8 +39,19 @@ export function EvidencePreview({
   }, [file, storage, attempt]);
   if (error)
     return (
-      <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+      <div
+        role="alert"
+        className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900"
+      >
+        <p className="font-medium break-words">{file.fileName}</p>
         <p>{error}</p>
+        {storage.mode === "browser-demo" && (
+          <p className="mt-2">
+            {file.submittedAt
+              ? "If the local file is missing or damaged, submitted evidence cannot be replaced. For this demo, reset or create an agreement and repeat with the original sample files."
+              : "If retrying does not help, remove this draft and upload the original file again."}
+          </p>
+        )}
         <button
           type="button"
           className="mt-2 underline"
@@ -73,6 +84,11 @@ export function EvidencePreview({
         <img
           src={resource.url}
           alt={file.caption || file.fileName}
+          onError={() =>
+            setError(
+              "This image could not be displayed. Retry the preview or check the original file.",
+            )
+          }
           className="h-40 w-full object-contain"
         />
       )}

@@ -1,7 +1,9 @@
 # Test workspaces
 
 - `unit/`: meaningful domain, authorization-helper, and component tests. Vitest uses jsdom by default; use `// @vitest-environment node` for pure server/domain modules when appropriate.
-- `e2e/`: Playwright transaction journeys, coordinated by Aiperi with each workstream owner.
+- `e2e/`: Playwright browser checks; Hayk coordinates release/settlement journeys with workstream owners. Tayma owns `handover-evidence.spec.ts` for evidence persistence, consent, comparison and recovery.
 - `setup.ts`: Testing Library matchers and cleanup.
 
 `unit/` covers the local demo lifecycle and persistence, domain validation/allocation, the simulated provider, and database foundation. The PGlite suite executes migrations and checks SQL constraints, row-level policies, funding and cancellation operations without Docker. It does not prove hosted Supabase configuration, true concurrent transaction safety, server authorization/route behavior, deadline scheduling, or real transfers. Follow the money, permissions, evidence, and complete-exchange checklist in `plan.md`; add hosted integration and end-to-end tests as those parts are implemented.
+
+For the six evidence browser checks, install Chromium with `npx playwright install chromium`, then run `npx playwright test tests/e2e/handover-evidence.spec.ts --workers=1`. The file uses `localhost:3000` to match the local development origin and waits for hydration before interacting. Original synthetic PNGs live in `public/demo-evidence/`; `scripts/generate-demo-evidence.mjs` regenerates them. The checks do not claim authenticated shared storage or complete financial settlement. See [the runbook](../docs/demo/handover-runbook.md) for manual rehearsal and fixture inputs.

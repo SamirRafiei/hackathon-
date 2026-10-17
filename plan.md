@@ -37,7 +37,7 @@ These are code capabilities, not proof of hosted operation or attribution of eve
 | Valera — setup and acceptance | Local apartment/equipment creation; Supabase sign-in/sign-up, hashed invitations, verified-email claiming, exact-version acceptance and server actions | Authenticated setup is separate; its agreement page does not continue into the full rental/payment lifecycle |
 | Hayk — application and presentation | Shared shell, branding, role switcher, reserved balance, next action, timeline, ledger and reset | Shared persistent dashboard/receipts/funding are not connected; final deployment/rehearsal is not established by code |
 
-Latest local verification at `43c2731`: **229 tests across 20 files passed**, plus TypeScript, lint, formatting and production build. Playwright is configured but has no committed browser journeys. Hosted Supabase, independent browser sessions and final deployment have not been verified. Do not rebuild completed modules.
+Baseline local verification at `43c2731`: **229 tests across 20 files passed**, plus TypeScript, lint, formatting and production build. There were no browser journeys at that checkpoint. Tayma’s subsequent evidence checks and handoff are recorded below; Hayk’s complete settlement journeys and final-origin rehearsal remain open. Hosted Supabase and shared independent-browser operation have not been verified. Do not rebuild completed modules.
 
 ## 3. Priority rules
 
@@ -45,7 +45,7 @@ Latest local verification at `43c2731`: **229 tests across 20 files passed**, pl
 - **P1 — optional:** start only after P0 checks pass on the release candidate. Cut these first if time is short.
 - **Deferred:** backend expansion and broader product features. Preserve existing code without making them presentation dependencies.
 
-All tasks below start open. Earlier unit tests do not mark a browser/deployment check complete. If verification finds no defect, record the check instead of redesigning the feature.
+Checked tasks have evidence recorded in their workstream notes. Earlier unit tests do not mark a browser/deployment check complete. If verification finds no defect, record the check instead of redesigning the feature.
 
 ## 4. Tasks by person
 
@@ -53,12 +53,14 @@ All tasks below start open. Earlier unit tests do not mark a browser/deployment 
 
 Already complete: all five handover modules and private downloads. Keep those implementations.
 
-- [ ] **T1 / P0 — verify photo persistence.** For apartment and equipment: upload sample photos, publish baseline, switch actors, acknowledge, reload and confirm files/checklists remain. Submit a return and reload again. Missing photos need an understandable retry/re-upload next action. Coordinate storage failures with Samir/Hayk; fix blockers found.
-- [ ] **T2 / P0 — verify consent and comparison.** No activation before funding and both acknowledgements; no routine return before activation. Baseline revision resets acknowledgement. Comparison uses the matching baseline/return. Reload, viewing and acknowledgement cannot move the first return deadline. Add focused tests for defects found.
-- [ ] **T3 / P0 — prepare the presentation evidence.** Supply small fake apartment/camera photos and checklist inputs. Check upload, preview, return and comparison at phone width and with keyboard navigation. Keep arrival's “no payment released” explanation clear.
-- [ ] **T4 / P1 — improve a specific upload/preview recovery issue found in rehearsal.** No new storage provider.
+- [x] **T1 / P0 — verify photo persistence.** For apartment and equipment: upload sample photos, publish baseline, switch actors, acknowledge, reload and confirm files/checklists remain. Submit a return and reload again. Missing photos need an understandable retry/re-upload next action. Coordinate storage failures with Samir/Hayk; fix blockers found.
+- [x] **T2 / P0 — verify consent and comparison.** No activation before funding and both acknowledgements; no routine return before activation. Baseline revision resets acknowledgement. Comparison uses the matching baseline/return. Reload, viewing and acknowledgement cannot move the first return deadline. Add focused tests for defects found.
+- [x] **T3 / P0 — prepare the presentation evidence.** Supply small fake apartment/camera photos and checklist inputs. Check upload, preview, return and comparison at phone width and with keyboard navigation. Keep arrival's “no payment released” explanation clear.
+- [x] **T4 / P1 — improve a specific upload/preview recovery issue found in rehearsal.** No new storage provider.
 
 **Handoff:** give Aiperi comparison evidence and Hayk the sample photos/reset instructions. Secure Supabase upload/finalization moves to the post-demo backlog.
+
+**Local completion checkpoint:** T1–T3 verified with six Chromium browser checks: apartment/equipment at 1280 px and 390 px, baseline revision, corrupt-photo recovery, actual IndexedDB blobs after reload, consent/deadline guards and keyboard-operated controls. T4’s discovered decode-error gap is fixed with filename, retry and safe recovery instructions. The four synthetic PNGs and exact checklist/reset inputs are in the [handover runbook](docs/demo/handover-runbook.md). This does not complete final deployed-origin rehearsal or Hayk’s settlement tests. See [implementation notes](src/features/handover/IMPLEMENTATION.md) for validation evidence.
 
 ### Samir — correct financial outcomes and state
 
