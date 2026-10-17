@@ -53,7 +53,7 @@ becomes failed, while current agreement/version gates prevent inappropriate retr
 If cancellation acquires the agreement lock first, it reconciles the persisted
 simulated outcome in its own transaction before creating the cancellation refund;
 see [Stage 2B cancellation](./CANCELLATION.md).
-Cancellation/refund implementation itself remains the next workstream milestone.
+Cancellation/refund implementation is in migration 005.
 
 Completion returns `ok: true` when the processing operation succeeds, with explicit
 `attemptState: succeeded | failed | cancelled`. A simulated decline is a successful
@@ -108,8 +108,8 @@ Runtime schemas validate input/results and sanitize transport failures. Do not w
 handler must use Valera's verified auth/session setup and a user-scoped client.
 
 The transport interface is hand-authored, not invented generated database types.
-The existing empty `src/types/database.ts` remains unchanged until the official
-Supabase generator can connect. Apply migrations 001–006, generate types, then wire
+The checked-in `src/types/database.ts` is a hand-maintained typed subset, not a
+generated schema. Apply migrations 001–007, generate types from the applied schema, then wire
 the typed Supabase clients at the server composition boundary. No hosted setup is
 assumed. Agreement creation/publication/acceptance RPCs are still separate work;
 local tests provision coherent accepted fixtures through administrator SQL.

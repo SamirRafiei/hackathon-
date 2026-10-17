@@ -1,9 +1,10 @@
 # Reserved routes
 
-Only `/` has a page. The other route folders contain `.gitkeep` files so Git preserves the team's workspace; they do not expose working screens.
+The landing page `/` is the browser-local walkthrough. The first authenticated agreement slice is available separately through the account workspace routes.
 
-- Valera: `(auth)/login`, `(auth)/signup`, `invite/[token]`, `agreements/new`.
-- Hayk: `dashboard`, `activity`, `agreements/[id]`, `agreements/[id]/funding`.
+- `/login`, `/signup`, and `/auth/callback`: Supabase email/password sign-in and verification callback.
+- `/agreements/new`, `/invite/[token]`, and `/agreements/[id]`: persistent authenticated create, claim, review, and acceptance flow.
+- Reserved follow-up routes: `dashboard`, `activity`, `agreements/[id]/funding`.
 - Tayma AlDabbas: `agreements/[id]/handover`, `agreements/[id]/return`.
 - Aiperi: `agreements/[id]/dispute`, `review`, `review/[caseId]`.
 - `api/`: future Route Handlers where needed, coordinated with the domain owner.

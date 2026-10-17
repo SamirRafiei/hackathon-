@@ -1,462 +1,327 @@
-# Pact — 24-hour hackathon implementation plan
+# Wise Deposit Protection — implementation plan
 
-> Make a pact. Keep it fair.
->
-> One link. One agreement. One protected exchange.
+> Secure deposits for anything you rent.
+Updated: 17 October 2026. Product proposal and 24-hour hackathon build plan.
 
-Status: local project foundation ready; product functionality not started.
-Team: five people. Delivery window: 24 hours from team kickoff (T+0).
-Repository: https://github.com/SamirRafiei/hackathon-
-Local workspace: `C:\Users\Hamza\Desktop\Pact`.
+**One conditional-payment engine, two payment purposes, three demonstration use cases:** apartment security deposits, equipment security deposits, and protected apartment reservation advances for students renting remotely.
 
-Use this document as the shared build checklist. Check a task only when its completion criteria pass. Record changes to the agreed rules here before implementing conflicting behavior.
+**Prototype boundary:** All funding, reservation, refunds, and owner allocations are simulated ledger entries. No actual funds are held or moved. No live Wise integration, Wise authentication, partnership, regulated escrow service, or legal certification is claimed. Display **“Demo — simulated funds”** beside balances and financial actions. “Protected” describes the proposed product; prototype records do not provide financial protection.
 
-## 1. Product, positioning, and success criteria
+This supersedes the landlord-only scope pivot. Preserve the existing Next.js/Supabase foundation and useful agreement, evidence, ledger, dashboard, and negotiation work. Do not claim any feature implemented merely because it appears in this plan.
 
-Pact documents temporary exchanges between people who have already arranged a transaction. It connects agreement terms, group deposit contributions, condition evidence, handover, return, and dispute resolution.
+## 1. Problem, users, and value
 
-**Pitch:** Pact is a proposed temporary-agreement and refundable-deposit layer for the existing Wise ecosystem. Show how the tool could fit naturally into that infrastructure and user experience while presenting a complete, standalone application.
+Renters often commit money before they can verify the asset or trust the owner. Owners want evidence of commitment and a fair way to recover justified damage costs. Informal transfers and chat messages leave both parties without shared terms, reliable deadlines, or a clear settlement history.
 
-**Hackathon reality:** Next.js and Supabase power the prototype. All payment, restricted-balance, deduction, and refund operations are simulated. No Wise API, Wise authentication, Wise account data, real payment rails, or actual money movement is required. Describe the Wise connection as the proposed product direction, not an existing integration or partnership. A small, consistent “Demo · simulated payments” label belongs beside money actions and in the demo introduction.
+For international students reserving accommodation remotely, there is an additional gap between finding a home and arriving to inspect it. A student might reserve a Budapest apartment in June or July and arrive in August. This is an illustrative scenario, not a verified claim about local market seasonality. Fake listings, impersonation, unavailable properties, and materially misleading descriptions can turn an advance payment into a loss.
 
-The delivery must demonstrate:
+| Target user | Need | Proposed value |
+|---|---|---|
+| Apartment tenant | Recover a security deposit fairly | Accepted condition baseline, visible refund deadline, challengeable deductions |
+| Equipment renter | Recover a short-duration deposit | Same protection for cameras, bikes, or tools, with asset-specific evidence |
+| Remote student | Commit to accommodation before arrival | Demonstrate payment commitment without releasing an advance before inspection |
+| Landlord/equipment owner | Secure commitment and justify damage claims | Funding visibility, agreed terms, documented evidence and settlement |
+| Future distribution partners | Add trust to existing rental journeys | Universities, relocation services and rental platforms could embed the workflow |
 
-- [ ] One ordinary account can own one agreement and borrow in another; there are no separate owner/borrower account tiers.
-- [ ] A separately authorized reviewer can inspect cases and record decisions.
-- [ ] An owner creates an agreement, invites borrowers, negotiates revisions, and obtains everyone's acceptance of one immutable version.
-- [ ] Multiple borrowers contribute their shares of one deposit in one currency.
-- [ ] Fully funded agreements support documented, mutually confirmed QR/code handover.
-- [ ] Any participating borrower can handle collection or return; the owner accepts the uploaded condition evidence.
-- [ ] Return starts a 24-hour inspection period before automatic full refunds; the owner can authorize an early full refund.
-- [ ] A timely damage claim blocks refunds and supports evidence, group negotiation, and reviewer resolution.
-- [ ] Full refunds, proportional partial refunds, cancellation refunds, and complete history persist in the database.
-- [ ] The deployed app looks and behaves like a finished product on desktop and mobile.
+**Value proposition:** Both sides agree what the money is for, when it can be released, and how disagreements are handled. The system connects accepted terms, private evidence, deadlines, and a traceable settlement. It reduces selected risks; it does not eliminate scams or guarantee factual truth.
 
-### Scope boundaries
+This is a payment-protection feature, not a rental marketplace, full property-management system, or general-purpose dispute court. Business/distribution hypotheses require user validation. Pricing is outside the MVP; no prototype fees or interest.
 
-Included: English; one item/property per agreement; one owner; one or more borrowers; EUR, USD, or GBP; optional rental-fee terms; copyable links; in-app status notifications; photos and supporting dispute documents.
+## 2. One engine, configurable purposes
 
-Deferred: real Wise/payment integration, currency conversion, rental-fee collection, external reminder emails, marketplace discovery, identity checks, native mobile apps, legally certified signatures, and assigning damage liability to one specific borrower. Acceptance records are the MVP's digital acceptance mechanism.
+Keep `purpose` separate from `asset_type`. Apartment and equipment deposits differ mainly in metadata and duration; a reservation advance differs in the normal recipient and release conditions.
 
-Do not drop multi-borrower support, server-side money controls, private evidence, or either demo outcome to save time. Reduce animation, optional visual flourishes, and notification polish first. Any larger scope change requires an explicit team decision recorded here.
+| Configuration | Apartment security deposit | Equipment security deposit | Student reservation advance |
+|---|---|---|---|
+| `purpose` | `SECURITY_DEPOSIT` | `SECURITY_DEPOSIT` | `RESERVATION_ADVANCE` |
+| `asset_type` | `APARTMENT` | `EQUIPMENT` | `APARTMENT` |
+| Intended use | Damage/agreed unpaid obligations | Damage/agreed rental obligations | Payment credited toward an agreed reservation/rent obligation |
+| Normal holding period | Tenancy | Equipment rental | Reservation until arrival/inspection |
+| Success condition | Return/move-out and inspection complete | Return and inspection complete | Renter inspects property, confirms access and conformity, explicitly approves release |
+| Normal recipient | Renter, less accepted/resolved deductions | Renter, less accepted/resolved deductions | Owner |
+| Failure/dispute | Damage, receipt, keys, deductions | Damage, missing accessories, non-return | Missing/fake/unavailable/misrepresented home or failed access |
+| Owner silence | Refund after uncontested return review | Refund after uncontested return review | No unilateral owner payout; use advance-specific timeout rules |
 
-## 2. Team ownership and integration rules
+Versioned policy fields: funding deadline, start/end or arrival dates, return-review duration, arrival confirmation deadline, cancellation rules, evidence requirements, permitted charges, default allocation, and dispute/escalation deadlines. These are validated configuration fields, not user-written executable rules.
 
-| Person | Team member | Primary workstream | Owns |
-| --- | --- | --- | --- |
-| 1 | Sameer | Database and workflow foundation | Schema, migrations, RLS, atomic transitions, simulated ledger, money allocation, shared types, cron database routines |
-| 2 | Valera Murzin | Identity and agreements | Auth/session setup, profiles, creation, invitations, revisions, acceptance |
-| 3 | Hayk | Funding and shared product UI | App shell/design tokens, dashboard, contribution screens, ledger/history, currency formatting |
-| 4 | Tayma AlDabbas | Evidence and physical exchange | Private uploads, photos/checklists, QR/code challenges, handover, return request and owner acknowledgment |
-| 5 | Aiperi | Inspection and disputes | Inspection UI, claim/evidence submission, settlement negotiation, reviewer UI, job monitoring, end-to-end demo coordination |
+Use a **48-hour review window** for both security-deposit demos, retaining the latest housing plan's simpler submission-triggered rule. Equipment can use a different accepted duration later; do not hard-code separate engines. The earlier 24-hour owner-acknowledgement trigger is superseded because a silent owner must not prevent the clock from starting.
 
-Sameer is the integration coordinator for this sprint. Each owner also tests their own flow and integrates with adjacent workstreams. Aiperi coordinates the final rehearsal; everyone participates in final QA.
+An advance is not automatically converted into a security deposit. If a student also needs an ongoing security deposit, create a separately accepted and funded agreement, optionally linked by `rental_reference`. Never count one amount as both paid rent and a refundable deposit.
 
-- [ ] Create one short-lived branch per workstream: `feat/core-ledger`, `feat/auth-agreements`, `feat/dashboard-funding`, `feat/handover-return`, `feat/disputes-review`.
-- [ ] Merge the shared scaffold and schema/contracts before extensive feature work. All team members pull that baseline.
-- [ ] Sameer owns schema migrations and generated database types. Others request additions rather than creating competing table definitions.
-- [ ] Hayk owns global styles, navigation, and shared UI components. Others build against the same primitives.
-- [ ] All financial/state-changing features call the shared domain operations; do not create independent implementations in page components.
-- [ ] Merge small complete slices throughout the sprint. Integrate a first full path by T+12 and freeze features at T+18.
-- [ ] Require a build/type check and a brief validation note before merging. Never commit credentials or demo passwords.
+## 3. End-to-end journeys
 
-## 3. Agreed product rules
+### 3.1 Shared setup and acceptance
 
-### Accounts, invitations, and revisions
+1. Owner creates an agreement: purpose, asset, parties, amount/currency, dates, policies and evidence requirements. Apartment fields include address/unit, listing snapshot, arrival/key arrangements and relevant inventory. Equipment fields include model/serial number, accessories and return location.
+2. Invite one renter with an expiring, revocable, high-entropy link. Store a token hash. Require sign-in and matching verified email before revealing private terms or claiming membership. Preserve invitation continuation through sign-in.
+3. Renter requests corrections if needed. Owner publishes an immutable version. Both explicitly accept that exact version; revisions invalidate earlier approvals.
+4. Show the default recipient, deadlines, cancellation policy and possible deductions before acceptance. Purpose-specific labels explain “refundable security deposit” versus “advance payment to owner after inspection.”
+5. Renter simulates funding after both accept. The server debits available demo value and credits reserved demo value atomically. Freeze terms and membership once funded.
 
-- Normal account capabilities depend on membership in each agreement. The owner cannot also be a borrower in that agreement; borrower emails cannot repeat.
-- Use Supabase email/password authentication. Provision demo accounts in advance so the presentation is independent of registration emails. Use verified email identity for real invitation matching; do not disable identity safeguards globally to simplify the demo.
-- The owner enters a borrower email and deposit share for every slot and copies a separate, high-entropy invitation link for each person. No outgoing email is needed.
-- Store invitation-token hashes, not raw tokens. Set an expiry (initial engineering default: 24 hours), support owner revocation/regeneration before funding, and prevent reuse to claim another slot.
-- Require sign-in with the matching verified email before disclosing private agreement content or claiming the invitation. Preserve the invitation destination across sign-in. The public link page shows only generic invitation information.
-- A borrower may propose edits. The owner publishes a revised immutable version containing the terms, currency, dates, participants, shares, policies, item details, and condition requirements.
-- Owner and all borrowers must accept the exact current version. Revisions reset acceptance for everyone. Persist the accepted snapshot and acceptance timestamp, not just a mutable checkbox.
-- No contributions until all participants accept. Once any contribution is secured, freeze the terms and membership. Changes then require cancellation/refunds and a new agreement.
+One ordinary account can own one agreement and rent in another. Roles belong to agreements. MVP: one owner and one renter; neither can fill both roles in the same agreement.
 
-### Deposit split and arithmetic
+### 3.2 Apartment and equipment security deposits
 
-- One currency per agreement: EUR, USD, or GBP. No FX or mixed-currency ledger entries within an agreement. Rental fee, if recorded, uses that currency and is not collected.
-- Use linked sliders plus accessible exact percentage inputs. Shares must sum to 100%; show each person's amount before acceptance. Use basis points internally (10,000 = 100%) and integer minor units for money.
-- Every borrower must owe a positive amount. Reject deposits/splits too small to allocate at least one minor unit to each borrower. Validate sensible amount and participant limits centrally.
-- Calculate contributions using the largest-remainder method with a stable participant-ID tie-break. Store the resulting amounts in the accepted version so UI and server never recompute differently.
-- Each borrower funds only their own contribution. Handover requires the entire deposit to be secured.
-- Deduct damage proportionally to the originally agreed shares, rounding deterministically and never beyond any person's secured contribution. Refund each person their own remaining amount. Owner allocation plus borrower refunds must equal the secured deposit exactly.
-- Example: EUR 250, shares 60/40 -> contributions EUR 150/EUR 100. An EUR 80 deduction -> deductions EUR 48/EUR 32 and refunds EUR 102/EUR 68; owner allocation EUR 80.
-- No platform fees in the MVP. Never use floating-point arithmetic for stored money.
+1. Both acknowledge the same versioned baseline: room/inventory/key checklist for an apartment; condition/serial/accessory checklist for equipment. A revision resets acknowledgements.
+2. Full funding plus both baseline acknowledgements activates the rental. Show “funded — awaiting handover baseline” before activation.
+3. Renter submits a return/move-out declaration with location, key/accessory details and evidence. This asserts return; it does not prove physical receipt.
+4. Server starts the accepted 48-hour review window exactly once. An owner acknowledgement or supplemental upload cannot restart it. Owner can dispute non-receipt, missing keys/accessories or condition within that window.
+5. Owner can approve a full refund early. With no timely dispute, a background job refunds the full reserved amount to the renter at expiry.
+6. A timely claim restricts the full amount while both discuss evidence and negotiate. A mutually approved split or simulated reviewer decision settles it once.
 
-### Collection, return, and inspection
+After activation, overdue return is an alert/escalation flag, not automatic deposit forfeiture. Either party can flag a problem and open an exception case while active; an owner cannot simply mark a renter's funds as theirs. No routine refund occurs while the rental is still active.
 
-- Any borrower can act for the group during collection or return; the accepted terms explicitly authorize this. Record who actually participated. All participants can see the resulting evidence.
-- At collection, the owner and a borrower confirm the item identity, accessories, condition photos, and a short-lived QR/code challenge. The borrower acknowledges receipt and the owner confirms release/evidence before activation.
-- At return, a borrower submits return photos/checklist and requests acknowledgment. Either side can initiate the workflow; a return is acknowledged only by the owner confirming physical receipt and the evidence.
-- Owner acknowledgment of physical receipt starts the inspection clock; it is distinct from confirming that the item is undamaged. Persist `returned_at` and `inspection_deadline = returned_at + 24 hours` using server time.
-- An owner may explicitly approve a full refund early. Otherwise, no timely claim by the deadline makes the deposit eligible for automatic full refunds.
-- A claim recorded before the inspection deadline blocks release of the entire deposit, even if the scheduled expiry job runs at the same time. At or after the deadline, new claims cannot block automatic release. Compare timestamps under the same database lock.
-- A return request unacknowledged for 24 hours goes to reviewer attention. Do not automatically assume receipt, start inspection, or release funds. The reviewer can resolve the receipt question with recorded evidence and reasons.
-- Overdue return is a flag on the active agreement. It enables escalation and in-app alerts; it does not automatically forfeit the deposit.
+### 3.3 Protected student reservation advance
 
-### Claims, negotiation, and review
+1. Owner supplies listing snapshot, address/unit, authority-to-let information, arrival time/access arrangements, what the advance will pay for, and cancellation/refund policy. Verification status is explicit; demo checks are labelled simulated.
+2. Both accept; student simulates funding. Owner sees a commitment confirmation, not spendable money. No early release action is offered before the agreed arrival stage.
+3. At arrival, student inspects the actual home and verifies access, availability and material conformity with the accepted listing. Owner may submit handover evidence; owner assertions cannot release funds.
+4. Student explicitly confirms the agreed conditions and approves the exact owner payment. Display the amount, recipient and finality before confirmation. This records consent, not independent proof that the listing is genuine.
+5. The server settles the advance to the owner. An ongoing security deposit remains a separate agreement.
+6. If the home is missing, inaccessible, unavailable or materially different, student opens a dispute and supplies evidence; funds stay reserved. Owner can agree a refund or negotiate a split.
+7. If there is no student approval, the deadline alone never releases the advance to the owner. Follow the rules below for non-response or a disputed no-show.
 
-- The owner records a claim reason and requested deduction between zero and the secured deposit during the inspection window. Preserve its server timestamp. Initial evidence should accompany the claim; missing evidence is flagged for follow-up rather than silently deciding the case.
-- Everyone can submit relevant photographs, receipts, invoices, explanations, and supporting documents. Reviewers have access to all relevant submitted documents, accepted agreement versions, condition records, and history for cases assigned to them. Evidence is not limited to the original condition photos.
-- Allow additional evidence after the initial claim, including on reviewer request. The deadline governs opening the claim, not the end of evidence collection.
-- A negotiated settlement requires explicit acceptance by the owner and every borrower. Any participant can propose a deduction amount with a reason. Changing a proposal resets its approvals.
-- Rejection or no unanimous settlement within 24 hours of claim creation sends the case to reviewer attention. Silence is not consent and does not award money.
-- Reviewer may request evidence, approve a full refund, or decide a deduction no greater than the owner's recorded claim or secured deposit. Record the policy basis, explanation, evidence considered, reviewer, and timestamp.
-- Where evidence is insufficient, set `awaiting_evidence` and retain the restriction. There is no default winner or automatic payout for unresolved cases; show the next required action and elapsed time.
-- A reviewer cannot decide their own agreement. Reviewer grants are configured by an administrator; users cannot grant themselves that role.
-- Once a unanimous settlement or final reviewer decision is recorded, post all proportional refunds and owner allocations atomically. Completed settlements cannot be changed through ordinary UI actions.
+## 4. State machine and authoritative operations
 
-### Cancellation and incomplete funding
-
-- Any participant may cancel before handover; refund every contribution already secured. Cancellation by the owner or borrower applies to the entire agreement, not just one borrower slot.
-- A processing contribution must be reconciled before cancellation completes. Locking/state checks prevent an in-flight simulated completion from securing money after cancellation.
-- Failed contributions remain retryable with a new attempt; requests repeated with the same idempotency key return the original result.
-- No automatic penalty for incomplete funding. Keep the agreement blocked and show the missing contributions; participants may cancel.
-- After handover, use return/dispute workflows instead of unilateral cancellation.
-
-## 4. User experience and Wise-inspired direction
-
-Build a full Pact product that feels suitable as a tool within Wise. Retain Pact's name and tagline. Use clear balances, visible amounts and currencies, calm state explanations, and an obvious next action rather than a generic rental-marketplace layout.
-
-- [ ] Establish a proposed palette: bright green primary actions (`#9FE870`), deep green text (`#163300`), warm light surfaces, clear warning/error colors. These are proposed implementation tokens; verify contrast before use.
-- [ ] Use spacious layouts, confident headings, rounded buttons, restrained cards, simple icons, and prominent amount typography. Use an available open font such as Inter; no proprietary font dependency.
-- [ ] Keep the persistent navigation simple: Overview, Agreements, Activity; show Review only to authorized reviewers. Put account controls in the same shell.
-- [ ] Include a concise concept entry screen explaining Pact's proposed role in the Wise ecosystem. Do not add fake Wise account connections or nonfunctional banking controls.
-- [ ] Build responsive phone and desktop layouts, keyboard-accessible dialogs/sliders, visible focus, meaningful labels, and status text that works without color.
-- [ ] Every screen needs loading, empty, validation, permission-denied, and recoverable-error states. Explain whose action is needed, rather than showing only a status badge.
-- [ ] Format currency everywhere with a shared formatter. Show contribution totals, each person's share, restricted amount, deductions, and refunds without ambiguity.
-- [ ] Present accepted terms and before/after evidence together in the return and dispute views. Show the inspection deadline in local time plus a countdown derived from the stored UTC deadline.
-- [ ] Use a private activity timeline for invitations, revisions, acceptances, contributions, handovers, return, claims, decisions, and refunds.
-
-### Required routes/screens
-
-| Route | Purpose | Primary owner |
-| --- | --- | --- |
-| `/` | Concept introduction and entry into Pact | Hayk |
-| `/login`, `/signup` | Authentication and invitation continuation | Valera |
-| `/dashboard` | Agreements, next actions, deposit summaries | Hayk |
-| `/agreements/new` | Item, dates, terms, currency, borrower split | Valera |
-| `/invite/[token]` | Secure invitation claim and review | Valera |
-| `/agreements/[id]` | Shared overview, accepted version, activity | Hayk + Valera |
-| `/agreements/[id]/funding` | Own contribution and group funding progress | Hayk |
-| `/agreements/[id]/handover` | Condition photos, accessories, QR/code, confirmations | Tayma AlDabbas |
-| `/agreements/[id]/return` | Return evidence, receipt confirmation, inspection status | Tayma AlDabbas + Aiperi |
-| `/agreements/[id]/dispute` | Claim, documents, proposals, approvals | Aiperi |
-| `/review` and `/review/[caseId]` | Assigned reviewer queue and evidence/decision workspace | Aiperi |
-| `/activity` | User-visible agreement and transaction history | Hayk |
-
-## 5. Technical architecture
-
-Use a single Next.js application with App Router, React, TypeScript, Tailwind, and a small shared UI library. Use Supabase PostgreSQL, Auth, and private Storage. Deploy on Vercel. Resolve mutually compatible stable package versions at kickoff, pin them in one lockfile, and avoid upgrades during the sprint.
-
-- Server Components load authorized data; Client Components handle forms, percentage controls, QR scanning, uploads, and interactive status.
-- Use `@supabase/ssr` browser/server clients and the current documented session-refresh pattern. Verify identity server-side; do not trust user data from `getSession()` for authorization.
-- Put domain operations behind authenticated Server Actions/Route Handlers. Each checks actor, membership, current version, payload, and transition. Layout checks and hidden buttons are not authorization.
-- Critical mutations execute a single controlled Postgres function/RPC transaction. Do not assemble a financial operation out of separate HTTP inserts/updates.
-- Keep client-readable tables under RLS. Deny direct client writes to balances, ledger, acceptance history, final decisions, and authoritative state fields. Route those mutations through controlled functions.
-- Controlled `SECURITY DEFINER` functions, if required, must use a safe `search_path`, qualified table names, explicit caller checks, and restricted execute grants. Review for RLS bypass.
-- Use Zod or an equivalent shared validation layer plus database constraints. The server calculates amounts, deadlines, and permissions.
-- Keep payment behavior behind a `DepositProvider` interface with only a `SimulatedDepositProvider` implementation. Future Wise/provider work is outside this sprint and must not shape the prototype around unverified APIs.
-- Poll active screens modestly and refresh after mutations. Realtime is optional polish; background deadline processing must work without any browser open.
-- Use Supabase Cron to invoke bounded, retry-safe database routines every minute for inspection expiry and review escalation. Record job results and expose failures for team inspection.
-- Use the same scheduler to create deduplicated in-app reminders before return deadlines (initial default: 24 hours and 1 hour beforehand, only when still in the future) and flag overdue returns. Persist notifications so closing the browser does not lose them.
-
-### Suggested source layout
+Use one lifecycle with purpose-specific guards and a separate money status. Do not encode every UI label as another lifecycle state.
 
 ```text
-src/app/                         routes, layouts, actions/handlers
-src/components/ui/               shared controls and visual tokens
-src/features/agreements/         creation, revisions, invitations, acceptance
-src/features/deposits/           funding, formatting, simulated provider adapter
-src/features/handover/           evidence, QR, collection and return
-src/features/disputes/           claims, settlements, reviewer workspace
-src/lib/supabase/                browser/server clients
-src/lib/domain/                  shared schemas, transitions, operation contracts
-src/lib/auth/                    identity and membership helpers
-src/types/database.ts            generated database types
-supabase/migrations/             ordered schema, RLS, functions, cron setup
-supabase/seed.sql                non-secret fixtures only
-scripts/                        development/demo provisioning and reset
-tests/                          domain, authorization, integration and E2E tests
+DRAFT -> AWAITING_ACCEPTANCE -> AWAITING_FUNDING -> FUNDED
+
+SECURITY_DEPOSIT:
+  FUNDED -> ACTIVE                  [both acknowledge current baseline]
+  ACTIVE -> REVIEW_PENDING          [renter submits return/move-out]
+  REVIEW_PENDING -> SETTLING         [owner approves refund OR deadline, no dispute]
+  FUNDED / ACTIVE / REVIEW_PENDING -> DISPUTED [permitted exception or timely claim]
+
+RESERVATION_ADVANCE:
+  FUNDED -> REVIEW_PENDING           [agreed arrival/inspection stage begins]
+  REVIEW_PENDING -> SETTLING         [renter explicitly approves owner payment]
+  FUNDED / REVIEW_PENDING -> DISPUTED [availability, cancellation or handover issue]
+  REVIEW_PENDING -> SETTLING         [refund deadline, no timely owner objection]
+
+BOTH:
+  DISPUTED -> SETTLING               [both approve same split OR demo reviewer decides]
+  SETTLING -> COMPLETED              [all ledger legs posted successfully]
+  eligible pre-activation state -> CANCELLED [refund funded value atomically]
+
+Money: UNFUNDED -> RESERVED -> SETTLED
+Case: OPEN -> NEGOTIATING / AWAITING_EVIDENCE / REVIEW_REQUIRED -> RESOLVED
 ```
 
-### Data model to finalize by T+2
+`CANCELLED` means any reserved value has actually been refunded. `COMPLETED` includes full refund, full owner payment or partial allocation, with outcome stored separately. Do not mark financial completion before settlement succeeds. In the simulated provider, settlement can post all legs atomically; retain `SETTLING` as an operation boundary without inventing payment delays.
 
-| Entity | Minimum responsibilities |
-| --- | --- |
-| `profiles` | Auth user reference, display name; no editable reviewer flag |
-| `reviewer_grants` | Protected reviewer authorization |
-| `agreements` | Owner, currency, current version, lifecycle, authoritative timestamps, row revision |
-| `agreement_versions` | Immutable item/terms/date/participant/share snapshot and policy version |
-| `participants` | Agreement membership, borrower email/user, share basis points, allocated contribution |
-| `invitations` | Participant/version binding, hashed token, expiry, claimed/revoked timestamps |
-| `change_requests` | Borrower-proposed changes and owner's response/publication |
-| `acceptances` | Actor and exact version, accepted timestamp; unique actor/version |
-| `contributions` | Borrower allocation and funding status, secured/refunded/deducted totals |
-| `payment_attempts` | Simulated processing/success/failure, operation key, immutable outcome |
-| `ledger_transactions`, `ledger_entries` | Immutable balanced movements in agreement currency |
-| `exchange_events` | Collection/return phases, actual actors, confirmations, item/accessory checklist |
-| `verification_challenges` | Purpose, token/code hash, expiry, attempt limit, consumed timestamp |
-| `evidence_files` | Private object path, uploader, phase/case, MIME/size/hash, timestamp and submission status |
-| `disputes`, `review_cases` | Claim amount/reason, restriction, negotiation deadline, assigned reviewer, evidence requests |
-| `settlement_proposals`, `proposal_acceptances` | Immutable deduction proposal and all-party approvals |
-| `reviewer_decisions` | Final decision amount, reason, evidence references, reviewer, policy version |
-| `settlements` | Single final disposition per agreement and per-borrower allocation |
-| `audit_events` | Append-only actor/action/time/reference history, safe metadata |
-| `notifications` | Participant-visible next-action/status notifications and read state |
+All mutations check authenticated actor, agreement membership or assigned reviewer authority, accepted version, current state and payload. Lock the agreement/financial row consistently, validate transitions, post ledger entries and append audit history in a single database transaction. Client buttons and browser clocks are never authoritative.
 
-Use UTC `timestamptz`, foreign keys, unique actor/version and operation constraints, and integer minor-unit amounts. State changes increment a row revision so stale forms cannot overwrite newer changes. Snapshot participant/share data in accepted versions even if membership records later change before funding.
+Core commands: publish/accept terms, claim invitation, fund, cancel, publish/acknowledge baseline, activate, submit return, enter arrival review, approve refund/advance release, open dispute, submit evidence/message, propose/approve settlement, assign/decide case, process deadlines.
 
-### Lifecycle and authorization contracts
+## 5. Deductions, disputes, cancellation and timeouts
 
-Maintain distinct agreement, contribution, and dispute states; derive human-readable deposit summaries from them instead of maintaining contradictory editable badges.
+### Allocation and consent
+
+- Store integer minor units and one currency per agreement. Primary demo currency: EUR. No FX, fees, interest or floating-point money.
+- A final proposal specifies `renter_refund_minor` and `owner_allocation_minor`; both are nonnegative and sum exactly to the reserved amount. No deduction can exceed the funded amount.
+- Example: €1,000 apartment deposit, €120 claimed, €80 accepted: €920 renter refund and €80 owner allocation. Equipment example: €300 deposit, accepted €25 damage: €275 refund and €25 allocation.
+- For an advance, a split is a negotiated payment/refund, not a damage deduction by default. E.g. €600 funded, accepted cancellation split: €550 refunded and €50 allocated only with both approvals or a demo review decision.
+- Both parties must explicitly approve the same immutable proposal version. A new amount or explanation resets approvals. Silence is not consent. Reading evidence is not payment approval.
+- Settle the entire amount once. Releasing undisputed portions incrementally is deferred.
+
+### Claims and independent review
+
+- Claims capture type, reason, requested allocation, relevant policy and supporting evidence/cost basis. The owner does not decide whether their own claim is valid.
+- Both parties can add photos, receipts, quotes, listing/communication records and explanations. Initial missing evidence is flagged, not treated as a win or loss. New evidence does not rewrite accepted baseline records.
+- If rejected or unresolved 24 hours after case opening, queue for a separately authorized **simulated reviewer**. This restores a bounded demonstration of independent review from the original plan; it is not legal arbitration or a claim of Wise support functionality.
+- Reviewer can request evidence, determine refund or allocation under the accepted demo policy, and record reasons and evidence considered. Cannot decide their own agreement. Owner allocation cannot exceed the owner's recorded requested amount or the reserved value; revised claims require explicit history and notification, not silent edits.
+- Reviewer access is limited to assigned cases. Grants are administrator controlled. Normal users cannot self-promote.
+- Insufficient evidence leaves the case `AWAITING_EVIDENCE` with a visible next action. Escalate overdue review for operations attention; never invent an automatic winner. A production service needs an authorized resolution body, service limits, complaints/appeals and a lawful route for unresolved funds.
+
+### Deadline policies
+
+All windows are disclosed in accepted terms, calculated from server UTC timestamps and displayed in local time. Defaults below are engineering/demo policies, not statutory rental rules.
+
+| Situation | Trigger and default | Outcome |
+|---|---|---|
+| Invitation expiry | 24 hours after issue | Cannot claim; owner can reissue before funding |
+| Incomplete funding | Accepted funding deadline | Cancel if unfunded; no penalty. Never activate without full funding |
+| Security return review | First renter return declaration + 48 hours | Full renter refund unless timely owner dispute |
+| No return declaration | Rental end passes | Flag overdue and allow escalation; no automatic owner payout/refund |
+| Advance arrival review | Accepted arrival timestamp; confirmation deadline +48 hours | Student approves release or either side raises issue |
+| Advance: no approval/no case | Confirmation deadline passes | Start 24-hour owner objection window, notify both; no owner release |
+| Advance: no owner objection | Objection deadline passes | Full renter refund via background job |
+| Advance: owner alleges successful handover/no-show | Before objection deadline | Open case; resolve with evidence, consent or demo reviewer |
+| Negotiation stalls | 24 hours after case opening | Reviewer attention, not settlement by silence |
+| Review remains unresolved | Review target exceeded | Alert operations, retain reserved state and show reason/next action |
+
+A student may dispute before the arrival date if the listing becomes unavailable. The owner may also flag an advance issue before the deadline; a contested cancellation does not bypass review.
+
+Security deposits: either party can cancel before activation for a full refund. Advances: either party can cancel before funding; after funding, an owner-agreed full refund is permitted, but disputed cancellation/no-show charges use negotiation/review. The MVP does not automatically debit cancellation penalties. Any future automatic fee policy needs explicit, valid terms and product/legal review.
+
+Claims count only when committed with server time strictly before the applicable deadline. At exactly the deadline, expiry wins. A single row lock and shared deadline predicate prevent races among claims, approvals and jobs. A qualifying earlier dispute always blocks a later deadline job. Repeated jobs cannot reopen settled agreements or produce extra postings. Job delays show “refund due — processing”; they never extend claim eligibility.
+
+## 6. Fraud safeguards and trust limits
+
+- Authenticated membership, verified-email invitations, matching identity, token expiry/revocation, rate limits and server authorization. Email verification is not identity verification.
+- For real deployment, verify identity and authority to rent/possess the asset; assess account risk, duplicate listings/asset identifiers and beneficiary changes. Prototype uses clearly labelled verification fixtures, not fake “Wise verified” badges.
+- Preserve accepted listing snapshots, property/unit and equipment serial details. Owner identity alone does not prove authority or prevent double booking.
+- Private, append-only submitted evidence; authorized short-lived downloads, size/type checks, and no public evidence URLs. Photos/timestamps do not prove authenticity, causation or ownership.
+- Advance release is unavailable before arrival; require a deliberate renter confirmation showing amount and recipient. Warn against pressure to approve before inspection or to pay outside the protected flow.
+- Freeze accepted parties, amounts, policy and payout identity after funding. No silent beneficiary substitution. Real payout verification and changed-account controls are production work.
+- Audit every acceptance, submission, claim, decision and financial action. Reject replayed/idempotency-conflicting requests. UI states must not imply funds are released because a screenshot says they are.
+- Independent review, abuse reporting and recorded reasons reduce unilateral control. Review itself can be abused or mistaken; preserve an honest unresolved state.
+- Still exposed: coerced approvals, forged evidence, account compromise, collusion, stolen equipment, duplicate reservations, funding reversals and inability to prove physical facts. Production fraud and chargeback handling are not implemented.
+
+## 7. MVP scope and experience
+
+Required: one owner/renter per agreement; all three presets; immutable accepted terms; simulated single-currency funding; private evidence; baseline acknowledgements for security deposits; student arrival confirmation; 48-hour return review; advance timeout/refund policy; full and split settlements; disputes with messages/evidence; minimal assigned reviewer view; dashboard, timeline, receipts; server deadline processing.
+
+Use one agreement detail page with purpose-aware sections, rather than three independent applications. Dashboard shows reserved totals separately by currency and next actions. An owner's reserved totals are never shown as spendable funds. Keep amount, recipient, purpose, deadline and required actor obvious on desktop and mobile. Provide loading, empty, permission, validation and recoverable-error states, keyboard access and readable status text.
+
+Screens: sign-in/invitation; dashboard; preset-based agreement creation; shared detail/terms/funding; baseline and return/arrival evidence; claim/discussion/settlement; authorized reviewer queue/case; final receipt/history.
+
+Deferred: group contributions/split sliders, representative consent, QR verification, marketplace search, rent collection, full leases, automated factual verification, AI adjudication, notification centre, external email reminders, native apps, real payment workers, real Wise API/auth, FX and legally binding arbitration. In-app next-action notices are sufficient for the demo; actual deadline notifications need delivery design before launch.
+
+Cut visual polish, rich document previews and optional currencies before correctness. Do not drop a use case or weaken money/access rules silently. If reviewer UI slips, keep the honest unresolved-dispute path and mark reviewer resolution unfinished; never substitute owner-controlled decisions.
+
+## 8. Architecture and data model
+
+Retain the source plan's **Next.js App Router, React, TypeScript, Tailwind, Supabase Auth/PostgreSQL/private Storage, and Vercel** architecture. Exact dependency/API setup must be checked when implementation begins; this revision does not change or certify package versions.
 
 ```text
-Agreement:
-draft -> awaiting_acceptance -> awaiting_funding -> ready_for_handover
-      -> active -> return_requested -> inspecting -> settling -> completed
+Shared UI / purpose presets
+          |
+Authenticated server actions / route handlers
+          |
+ConditionalPaymentService + validated policy guards
+          |
+Atomic PostgreSQL operations: state + ledger + audit
+          |                         |
+SimulatedPaymentProvider       Deadline worker / reviewer actions
 
-Before handover: -> cancelling -> cancelled (refund funded contributions)
-From inspecting: -> disputed -> settling -> completed
-
-Review flags/cases: overdue_return, unacknowledged_return,
-                    negotiation_expired, awaiting_evidence
-
-Contribution:
-awaiting_payment -> processing -> secured -> refund_pending
-                -> refunded | partially_refunded | allocated_to_owner
-processing -> failed -> processing (new attempt)
-
-Dispute:
-negotiating -> in_review -> awaiting_evidence -> in_review -> resolved
-negotiating -> resolved (unanimous settlement)
+Supabase Auth: identity; RLS: agreement/case access; private Storage: evidence
 ```
 
-Map these to UI labels such as Awaiting payment, Payment processing, Deposit secured, Awaiting return, Refund pending, Refunded, Disputed, and Partially refunded. A group can contain both funded and unfunded borrowers; show this directly. A 100% deduction has an explicit owner-allocation outcome rather than a misleading “refunded” label.
+`PaymentProvider` exposes fund/settle/refund operations; only `SimulatedPaymentProvider` exists in MVP. No imagined Wise “escrow endpoint.” Keep future production provider operations asynchronous and reconciled when designed; local database atomicity cannot guarantee external transfer atomicity.
 
-Agree these operation names and request/response types before parallel implementation:
+| Entity | Minimum data/responsibility |
+|---|---|
+| `profiles` | Auth ID, display name; no self-editable reviewer role |
+| `agreements` | Owner/renter, current version, purpose, asset type, currency, amount, lifecycle, outcome, rental reference |
+| `agreement_versions` | Immutable asset/listing snapshot, dates, payment purpose, default recipient, policy and deadlines, cancellation terms |
+| `invitations`, `acceptances` | Token hash/expiry/revocation, intended identity, accepted version, actor and timestamp |
+| `condition_records`, `acknowledgements` | Baseline versions, return/arrival records, exact-version acknowledgements, physical-access assertions |
+| `evidence_files` | Private object path, uploader, phase/case, MIME/size, server timestamps; append-only after submission |
+| `funding_records` | Funder, currency, amount, unique funding operation |
+| `disputes`, `messages` | Case type, claim/requested allocation, reason, evidence references, status, response targets |
+| `proposals`, `proposal_approvals` | Immutable complete split/reason, version, both approvals |
+| `reviewer_grants`, `case_assignments`, `decisions` | Restricted authority, case access, rationale, evidence considered and decided split |
+| `settlements`, `ledger_transactions`, `ledger_entries` | Unique final settlement, balanced simulated movements, operation IDs and receipts |
+| `audit_events`, `deadline_jobs` | Actor/action/history, authoritative due time, deduplication and job success/failure |
 
-| Operation | Caller and required checks |
-| --- | --- |
-| `publishAgreementVersion` | Owner; no secured contributions; validated split; reset acceptance |
-| `claimInvitation` | Authenticated matching verified email; valid unclaimed token/version |
-| `proposeAgreementChange` | Participating borrower; not funded; no direct terms overwrite |
-| `acceptAgreementVersion` | Owner/borrower; exact current immutable version |
-| `startContribution` / `completeSimulatedContribution` | Own contribution; everyone accepted; valid attempt; not cancelled |
-| `cancelAgreement` | Participant; no completed handover; reconcile attempts; refund atomically |
-| `createVerificationChallenge` / `confirmHandover` | Owner/borrower; fully funded; purpose/expiry/replay/actor checks |
-| `requestReturn` / `acknowledgeReturn` | Participant request; owner acknowledgment; submitted evidence; set inspection deadline once |
-| `approveFullRefund` | Owner; inspection state; no open claim; settle once |
-| `openClaim` / `submitEvidence` | Owner opens timely claim; participants/reviewer submit authorized evidence |
-| `proposeSettlement` / `acceptSettlement` | Participants; current proposal; require all approvals |
-| `recordReviewerDecision` | Assigned independent reviewer; reason/evidence/policy; amount limits |
-| `processDueInspections` / `escalateDueCases` | Scheduler only; bounded batches; authoritative UTC time; idempotency |
+Prefer extending compatible existing tables. Normalize mutable lifecycle separately from accepted terms. Derive all authoritative amounts and timestamps on the server.
 
-Every mutation returns a typed success or a recoverable reason such as `stale_version`, `not_authorized`, `invalid_state`, `inspection_expired`, or `already_processed`. Never expose database internals or private membership details in public errors.
+Financial invariant per agreement:
 
-### Ledger and concurrency invariants
+```text
+funded_minor = reserved_remaining_minor + renter_refunded_minor + owner_allocated_minor
+final: reserved_remaining_minor = 0
+all amounts >= 0; all postings use the agreement currency
+```
 
-- [ ] Use balanced append-only ledger postings: borrower simulated source -> restricted deposit on funding; restricted deposit -> borrower refund/owner allocation on settlement. No real balances are implied.
-- [ ] At all times, total secured equals restricted remainder plus cumulative borrower refunds plus cumulative owner allocation. Each transaction balances to zero in one currency.
-- [ ] Lock the agreement row first, then related rows in a consistent order for payment completion, cancellation, claims, expiry, and settlement.
-- [ ] Validate the complete transition, post entries, update aggregates, and append an audit event in one transaction.
-- [ ] Use unique operation keys scoped to actor/operation; reject reuse with a different payload. Add a unique final settlement per agreement.
-- [ ] Repeated clicks, retries, cron reruns, and concurrent claim/expiry requests cannot double-fund, double-refund, or release restricted funds.
-- [ ] Simulate a visible processing stage with persisted attempts. A bounded worker/authorized completion operation advances due attempts; do not rely on a page timer for completion. Include a deterministic failure/retry fixture.
-- [ ] For the simulated MVP, a final atomic settlement can record all refund/owner legs as successful together. Preserve processing/pending events in history; never mark completed before all legs succeed.
+Append-only balanced ledger; corrections use compensating entries. Scope idempotency keys to operation/actor and reject key reuse with changed payload. Unique funding and final settlement constraints prevent double execution.
 
-## 6. Evidence, QR verification, handover, and return checklist
+RLS protects agreement tables; private storage checks membership or assigned case access. Deny ordinary client writes to balances, authoritative states, acceptance history and decisions. Critical mutations use a controlled transactional function with explicit actor checks; privileged functions require restricted grants, qualified names and safe search paths. Keep privileged keys out of browser code, logs and Git.
 
-Dependencies: shared auth client and membership helpers; private bucket/RLS; agreement and exchange-event schema; critical transition functions. Begin UI and uploader work against typed contracts while Sameer builds the RPCs.
+Use a bounded, retry-safe server scheduler, preferably existing Supabase Cron, to process return expiry, arrival stages, advance objections/refunds and review escalation. It runs with no browser open. Persist last success/failure and alert on stalled work. Re-check state and deadline under lock for every job. Polling/countdowns are presentation only.
 
-- [ ] Build a reusable uploader for item, collection, return, and dispute evidence. Support mobile camera/file selection, thumbnails, progress, retry, removal before submission, and readable error messages.
-- [ ] Start with JPEG/PNG/WebP photos (up to 10 MB each) and PDF dispute documents (up to 10 MB). Reject executable/HTML/SVG uploads; validate content and metadata server-side. Add HEIC conversion only if time remains.
-- [ ] Keep one private bucket with agreement/phase/random object paths. Participants can upload only to their own authorized records; reviewers see assigned-case material. Use short-lived signed downloads created after access checks.
-- [ ] Finalize upload metadata before allowing a confirmation. Submitted evidence is append-only; preserve original files and record additions instead of replacing accepted proof.
-- [ ] Item identifiers/accessories must appear next to photos. Capture uploader, actual participant, phase, and server timestamp; do not claim device photo time proves when an image was taken.
-- [ ] Generate a purpose-bound collection QR challenge only for funded agreements. QR opens the authenticated confirmation screen; it contains a random challenge reference, not private item data.
-- [ ] Provide a manual code fallback for camera/permission problems. Initial defaults: 10-minute validity, one-use challenge, rate-limited verification, limited attempts. Hash stored challenge values.
-- [ ] Require distinct owner and borrower confirmations. Scanning alone is not consent. Reject same-actor completion, stale challenges, wrong agreements, replay, and unfunded handover.
-- [ ] Build return initiation and any-borrower evidence submission. Owner views the photos/checklist before acknowledging physical receipt. Aiperi owns inspection/claim actions after that acknowledgment.
-- [ ] Integrate a return verification code where both parties are present; allow a documented remote return request that remains pending until the owner acknowledges it. Never require one designated lead borrower.
-- [ ] Show inspection deadline and link to claim/refund actions after receipt, with shared records accessible to every borrower.
+Evidence: basic JPEG/PNG/WebP and PDF, initially up to 10 MB/file, with server-side type/content/size validation. Rich previews and HEIC conversion are optional. Preserve the source folder structure where possible: agreements, deposits, condition, disputes, shared domain/auth/Supabase helpers, migrations, controlled seed/reset scripts and focused tests.
 
-Done when: phone upload and desktop review work; QR and manual fallback work; replay is rejected; unauthorized users cannot access objects; any borrower can collect/return; owner receipt sets the deadline exactly once; evidence appears in Aiperi's review screen.
+## 9. Implementation milestones and team ownership
 
-## 7. Implementation schedule and checkpoints
+Retain the five-person structure as proposed assignments; team availability/acceptance is not verified by this document. Relative times start at the team's agreed kickoff, not at this file's creation.
 
-### T+0 to T+2 — Shared foundation
+| Owner | Main responsibility |
+|---|---|
+| Sameer | Schema/contracts coordination, ledger, atomic transitions, scheduler, invariants |
+| Valera Murzin | Auth/invitations, version acceptance, purpose presets and agreement creation |
+| Hayk | Shared shell/dashboard, funding and receipts, application integration and deployment |
+| Tayma AlDabbas | Private evidence, asset-specific baseline/return, student inspection and listing comparison |
+| Aiperi | Claims/messages/proposals, minimal reviewer view, deadline UI and demo coordination |
 
-- [ ] Sameer + Valera: confirm repository write access for all five contributors; protect secrets and agree merge ownership.
-- [x] Shared foundation: scaffold the Next.js TypeScript application in this repository, preserving `plan.md`; add one package manager/lockfile, lint/type/build commands, validation and test tools. Prepared with reserved team folders; product functionality remains unimplemented.
-- [ ] Sameer: provision/select the team's Supabase project; record schema migrations; generate types; initialize local setup instructions.
-- [ ] Valera: configure Auth, site URL, local/deployed redirect URLs, SSR clients and demo user provisioning.
-- [ ] Hayk: land navigation, responsive shell, proposed design tokens, inputs/buttons/status/amount components, and one reference agreement screen.
-- [ ] Entire team: freeze schema v1, operation contracts, states, ownership, and file conventions. Agree non-secret seed identities and fixture IDs.
-- [ ] Sameer: set up Vercel project and first preview early, with environment variables and Auth redirects. Do not leave deployment discovery to the last hour.
+All workstreams use shared operation contracts and components. Merge small complete slices with build/type checks and relevant validation. Financial changes receive consistent review. Keep secrets outside version control.
 
-Exit: every developer can start the app; preview loads; typed contracts are shared; auth, storage, cron availability, and repository access are known. Resolve setup blockers here.
+| Milestone | Work and exit criteria |
+|---|---|
+| T+0–2: contracts/foundation | Inspect existing implementation; agree presets, states, policies, schema and fixture IDs. Confirm Auth/private storage/scheduler and first preview. Every team member can run the app |
+| T+2–6: setup/funding | Create all three agreement presets, private invite, version acceptance, atomic simulated funding and permitted cancellation. Two authenticated users see one persisted agreement; strangers cannot |
+| T+6–12: complete success flows | Integrate security baseline/activation/return/full refund plus advance arrival approval/owner payment. Receipts and timeline survive refresh; default security expiry runs without a browser |
+| T+12–18: exceptions | Claim, evidence, immutable split and both approvals; minimal independent demo decision; advance non-response/refund and objection branch. Claim/expiry races pass. Freeze features at T+18 |
+| T+18–22: verification/release | Focused domain/access/journey checks; mobile/keyboard basics; final storage/Auth/scheduler configuration; coherent fixtures and backup walkthrough |
+| T+22–24: rehearsal/buffer | Rehearse independent sessions at final URL, fix blockers, retain last working deployment and submit |
 
-### T+2 to T+6 — First vertical slices
+Completion record: local foundation was previously recorded complete in the source plan and is not revalidated here. Unified schema, all product journeys, reviewer flow, security checks and deployment remain **pending verification**. This document revises planning only.
 
-- [ ] Valera: create/revise an agreement, borrower email slots, linked split controls with Hayk's primitives, and copyable invitations.
-- [ ] Sameer: migrations, RLS, acceptance and allocation functions, atomic funding/cancellation foundations.
-- [ ] Hayk: dashboard, agreement overview, per-borrower funding UI, processing/error states, timeline components.
-- [ ] Tayma AlDabbas: private upload component, collection/return checklists, challenge screens and phone fallback.
-- [ ] Aiperi: inspection view, claim form, evidence workspace, reviewer queue using the shared contracts.
+## 10. Required validation
 
-Exit: owner can create and invite; borrower can authenticate and view their own invitation; unauthorized agreement/evidence access is denied. First integrated feature branches merged.
+- [ ] Both accept the exact version; edits reset approvals; funded terms/parties cannot change.
+- [ ] Both security presets require funding and baseline acknowledgement before activation.
+- [ ] Advance approval allocates to owner; security default expiry refunds renter. Purpose cannot be changed to invert recipients after funding.
+- [ ] Early advance release, owner-only release and release while disputed are rejected.
+- [ ] Return declaration starts one deadline; repeated submissions/uploads/acknowledgements do not extend it.
+- [ ] Timely claim blocks expiry; exact-boundary and delayed-job checks use server time under the same lock.
+- [ ] Advance no-response never pays owner automatically; no objection refunds; timely owner objection opens review.
+- [ ] No-show, failed access, disputed receipt and overdue return have explicit next actions, without automatic forfeiture.
+- [ ] €1,000 -> €920/€80 and €300 -> €275/€25 conserve value; zero/full allocations and odd cents work; negatives/overfunding/currency mismatch fail.
+- [ ] Duplicate funding, approval, settlement and worker retries create one financial outcome. Concurrent cancel/fund or claim/expiry cannot duplicate or lose value.
+- [ ] Stale proposal approval fails; rejection or silence in an open dispute never releases money.
+- [ ] Stranger/wrong-email user cannot read agreement, invitation contents, ledger or files. Reviewer cannot access unassigned cases, self-assign privileges or decide their own agreement.
+- [ ] Finalized evidence cannot be replaced; privileged keys are absent from client bundles/Git; private responses are not publicly cached.
+- [ ] Background jobs work without browser sessions; failures/pending refunds are visible and retry-safe.
+- [ ] A new browser session shows the same state/history/receipt. All three success paths and dispute branches work on deployed preview.
 
-### T+6 to T+12 — Complete successful exchange
+Prioritize meaningful financial, authorization, deadline and end-to-end checks over cosmetic UI snapshots.
 
-- [ ] Valera: all-party current-version acceptance and stale-version rejection; proposal/publication flow.
-- [ ] Sameer + Hayk: simulated funding, deterministic splits, duplicate prevention, failed-payment retry, and pre-handover cancellation/refunds.
-- [ ] Tayma AlDabbas: fully funded handover with photos, two-party confirmations, QR/manual code; active agreement and return acknowledgment.
-- [ ] Aiperi + Sameer: early full-refund approval and scheduled expiry through one settlement operation; unacknowledged-return escalation.
-- [ ] Hayk: accurate group deposit summaries and persisted transaction history.
-- [ ] Hayk + Sameer: persisted due-date reminders, overdue flags, and status-change notifications with duplicate prevention.
+## 11. Demo scenarios and presentation
 
-Exit: on the deployed preview, two real signed-in users complete create -> accept -> fund -> handover -> return -> full refund. A second borrower can fund a separate share. No core screen depends on invented local-only state.
+Seed clearly labelled fixtures with coherent acceptance, evidence, ledger and audit history. Use independently signed-in owner/renter/reviewer accounts. Keep credentials out of the repository. Near-expiry fixtures use pre-established server deadlines and are explicitly described as accelerated examples; never expose a public clock override. Reset only allowlisted demo data in the dedicated environment.
 
-### T+12 to T+18 — Group disputes and complete integration
+| Scenario | Action | Expected result |
+|---|---|---|
+| Apartment deposit | €1,000; baseline and move-out evidence; no timely claim | Full €1,000 renter refund by deadline job |
+| Equipment clean return | €300 camera deposit; owner approves refund | Full €300 refund using the same engine |
+| Equipment damage | Owner requests €25 with receipt; renter accepts | €275 refund / €25 owner allocation |
+| Apartment disputed deduction | €120 claimed; renter contests; agree €80 or reviewer decides | Restriction during dispute, then €920 / €80 with rationale |
+| Student successful arrival | €600 advance; student inspects actual unit and approves | €600 owner payment; no continuing security-deposit balance |
+| Student missing/misrepresented property | Student reports failed access with evidence | No owner payout; agreed or demo-reviewed €600 refund |
+| Student non-response | No approval; confirmation and objection windows expire | Full refund; a timely owner objection instead opens dispute |
+| Unresolved evidence | Reviewer requests documents | Funds remain simulated-reserved; next action is explicit |
 
-- [ ] Aiperi: timely claim and restriction, all-party proposal approval, rejection/escalation, supporting-document submission, reviewer evidence request and decision.
-- [ ] Sameer: proportional deduction/refund allocation, settlement uniqueness, claim/expiry locking, authorization coverage.
-- [ ] Tayma AlDabbas + Aiperi: collection/return comparison plus all relevant documents in the case workspace.
-- [ ] Valera: verify invitation expiry/reissue, acceptance reset, frozen membership after funding, wrong-email handling.
-- [ ] Hayk: multi-borrower balances, partial/full refund receipts, owner allocation, notification and history consistency.
-- [ ] Entire team: integrate on preview and fix broken cross-workstream flows. Feature freeze at T+18.
+Suggested five-minute live walkthrough: explain the remote student's problem and simulation boundary; open the three preset cards; show one accepted/funded student agreement and explicit arrival approval; show camera return and partial deduction; show apartment auto-refund on a near-due fixture; open a disputed failed-handover case and reviewer evidence view; close on the common timeline/ledger and pitch. Keep remaining cases as backup fixtures rather than attempting eight full live journeys.
 
-Exit: both EUR 250 scenarios and the 60/40 group case work end to end; reviewer cannot access unrelated cases or decide their own exchange; cron runs are observable.
+## 12. Wise and production limitations
 
-### T+18 to T+22 — Verification, polish, deployment
+**Wise Deposit Protection is a proposed feature name, not an announced Wise product.** General Wise payment/balance APIs are not evidence that this escrow-like rental workflow is supported. The official developer guide distinguishes partner integrations from personal-token access; partner account setup describes jurisdictional eligibility and compliance approval. Integration design and commercial authorization remain unresolved. See [Wise developer guide](https://docs.wise.com/guides/developer) and [Wise partner account setup](https://docs.wise.com/guides/product/account-setup).
 
-- [ ] Run the focused tests below; fix blockers before cosmetic improvements.
-- [ ] Complete keyboard/mobile checks, empty/error states, permission messaging, screenshot and document readability.
-- [ ] Verify production environment variables, Auth redirects, migrations, private bucket settings, cron scheduling and reviewer grants.
-- [ ] Build and deploy the release candidate. Verify direct links and refresh behavior on deployed routes.
-- [ ] Provision a controlled demo dataset and credentials outside Git; verify independent browser sessions.
-- [ ] Prepare the pitch, screenshots, backup walkthrough, and a clear simulated-payments explanation.
+Wise's safeguarding descriptions concern protection of customer funds under the relevant service/entity arrangements; they do not by themselves establish authority to adjudicate rental disputes or implement this conditional-payment product. See [Wise's explanation of safeguarding for its UK entity](https://wise.com/help/articles/4IusAofIppsIGPcs7sEIXI/how-our-uk-entity-wise-payments-ltd-safeguards-customer-funds). These references were consulted for product boundaries, not as legal approval or evidence of Hungarian availability.
 
-### T+22 to T+24 — Rehearsal and submission buffer
+Before any real-money launch, obtain provider confirmation of the permitted custody/restriction/release model and duration, supported countries/currencies and roles. Commission jurisdiction-specific assessment of tenancy deposits, advance payments, consumer cancellation rights, identity/AML obligations, data retention, safeguarding, dispute authority and complaints. Determine whether a licensed custody/escrow partner is needed. No assumption of unlimited holds, interest treatment or automatic application of the prototype's 48-hour rule is acceptable.
 
-- [ ] Rehearse the full demo on the final URL and actual devices. Avoid last-minute dependency/schema changes.
-- [ ] Fix only submission/demo blockers; retain the last working deployment.
-- [ ] Confirm repository, deployment URL, README, team attribution, screenshots/video, and required hackathon submission fields.
-- [ ] Submit before T+24; reserve time for upload/permission failures.
+Production also needs payment-webhook verification, provider reconciliation, failed/partial payout recovery, funding reversals/chargebacks, beneficiary verification, operational review staffing and escalation, reliable notice delivery, incident response and an authorized route to resolve outstanding funds. A local ledger flag cannot freeze a completed ordinary bank transfer. Never collect real payments into a developer account for this prototype.
 
-## 8. Verification that must pass
+## 13. Concise pitch
 
-Use meaningful tests around money, access, state, and complete journeys. Avoid spending the sprint on snapshot tests of simple components.
+**Wise Deposit Protection brings one clear agreement to the money behind a rental.** Apartment tenants and equipment renters get transparent refundable deposits; students reserving a home from abroad can commit funds without releasing an advance before arrival and inspection. Owners see commitment and can document justified claims. One configurable conditional-payment engine connects terms, evidence, deadlines and fair settlement. The hackathon demonstrates the complete workflow with simulated funds; real-money delivery requires an authorized provider and regulatory model.
 
-### Domain and database tests — Sameer
+## 14. Revision provenance
 
-- [ ] Exact allocation: 60/40 split, three borrowers, awkward cents, deterministic rounding, very small deposit rejection, 0%/negative/non-100% share rejection, currency mismatch.
-- [ ] Deductions: zero, EUR 80 of EUR 250, full deposit, odd-cent rounding; no borrower deduction exceeds contribution; sum is conserved.
-- [ ] Funding requires every current-version acceptance; stale acceptance and frozen-term changes are rejected.
-- [ ] Repeated payment/settlement keys return one outcome; key reuse with changed data is rejected.
-- [ ] Concurrent payment/cancellation and claim/expiry operations preserve funds and produce one legal outcome.
-- [ ] Re-running cron or settlement after completion cannot create new postings.
+Revised from the original **Pact — 24-hour hackathon implementation plan** backup and the later **Pact — Landlord–Tenant Deposit Implementation Plan**, together with the referenced “GitHub label organisation” conversation.
 
-### Authorization and evidence tests — each owner, coordinated by Valera
+Preserved: existing stack/foundation, team structure, immutable acceptance, secure invitations, private evidence, integer ledger, atomic/idempotent settlement, dashboard/receipts, deployment and rehearsal schedule. Restored equipment support and a minimal simulated reviewer from the original plan. Retained the later housing plan's submission-triggered 48-hour rule and two-person MVP. Added protected advances with a different default recipient, explicit arrival approval, cancellation/objection handling, fraud safeguards and production authorization gates. Group deposits, QR flows and broader non-rental conditional payments remain deferred.
 
-- [ ] Stranger cannot read agreement, invitation details, files, ledger, or case by guessing IDs.
-- [ ] Wrong-email user cannot claim a slot; expired/revoked token fails; token reuse cannot change membership.
-- [ ] Borrower cannot pay for another borrower, approve owner receipt, open an owner damage claim, edit shares after funding, or set a reviewer flag.
-- [ ] Owner cannot release a disputed deposit unilaterally; regular users cannot run scheduler or reviewer operations.
-- [ ] Reviewer sees all relevant submitted case documents but cannot decide a case involving themselves.
-- [ ] Private storage policies reject unauthorized listing/upload/download and finalized-file replacement.
-- [ ] Wrong-purpose/expired/replayed codes and same-actor dual confirmation fail.
 
-### End-to-end acceptance journeys — Aiperi coordinates
+## Handover implementation checkpoint — 17 October 2026
 
-- [ ] Scenario A: Alex lends camera to Sam, EUR 250, three days; accept, fund, hand over, return, inspect/approve early, refund EUR 250, complete.
-- [ ] Automatic expiry: stored deadline elapses without a claim; background job refunds without anyone opening the app. Test the exact cutoff and visible pending/complete behavior.
-- [ ] Scenario B: timely EUR 80 claim; Sam rejects; funds remain restricted; documents are visible; later unanimous settlement or reviewer decision refunds EUR 170 and allocates EUR 80.
-- [ ] Group scenario: EUR 250 at 60/40; separate matching-email invitations; both borrowers accept and fund; either can return; EUR 80 deduction yields EUR 102/EUR 68 refunds.
-- [ ] Group consent: one borrower refuses a settlement; no release occurs until a permitted resolution.
-- [ ] Revision: borrower proposes a change; owner publishes; all previous approvals reset; funding remains blocked until everyone accepts again.
-- [ ] Cancellation after only one contribution: that person receives their exact contribution back; no unfunded person receives money.
-- [ ] Non-response: unacknowledged return and expired negotiation create reviewer attention; unresolved evidence request keeps funds restricted.
-- [ ] Refresh/new browser session shows the same authoritative state and history.
+Five feature modules have been implemented and integrated into the browser-local demonstration: evidence upload/preview adapters, versioned condition baseline and acknowledgments, photographed return declarations, before/after comparison, and student arrival/listing inspection. The return fixes a 48-hour device-clock deadline without releasing funds; both baseline acknowledgments are required before activation. QR remains deferred.
 
-## 9. Demo data, clocks, and presentation
+Verification: focused validation/UI/integration tests; full project checks including existing database regressions and production build; browser photo reload, two-party activation, return declaration and comparison; phone-width overflow check. This does not establish hosted Supabase behavior. The demo uses fake identities, localStorage metadata and IndexedDB photo files.
 
-- [ ] Provision Alex, Sam, a second borrower, and an independent reviewer in the demo environment. Provision another owner/borrower-role example if needed to show one ordinary account supports both.
-- [ ] Seed an unfunded camera agreement, an active agreement, a returned agreement near inspection expiry, and a disputed group agreement. Include camera photographs, accessories, and a plausible damage receipt/invoice.
-- [ ] Use the same real workflow operations for the live path. Seed advanced states with coherent ledger/audit records rather than changing badges manually.
-- [ ] Keep the normal policy at 24 hours. To demonstrate expiry quickly, use a separately labeled seed fixture with a pre-established near-due server deadline; do not expose a public clock override or pretend the live exchange waited 24 hours.
-- [ ] Reset only allowlisted demo records in the dedicated demo project, through a privileged development script; never expose a reset control to ordinary users or run it during someone else's demo.
-- [ ] Keep demo credentials in a team secret channel/environment, never committed to the repository or shown in screenshots.
-
-Suggested five-minute walkthrough:
-
-1. Explain the existing informal-exchange problem and Pact's proposed place within Wise.
-2. Show Alex's agreement, one currency, participants, and the split controls; copy separate links.
-3. Show Sam and the second borrower accepting the same version and securing their own contributions.
-4. Show the funded balance, condition evidence, and QR/manual collection verification.
-5. Show return receipt and the 24-hour inspection protection; demonstrate early refund or the near-due fixture.
-6. Open the disputed fixture: compare before/after evidence and documents, show group consent or reviewer decision, then show proportional refunds and the audit trail.
-7. Close with the value proposition and explain that financial movements are simulated; a real Wise integration is the future proposal.
-
-## 10. Environment, release, and operational checklist
-
-- [ ] Commit `.env.example` with names/placeholders only: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_APP_URL`. Use the appropriate public key name for the selected Supabase setup consistently.
-- [ ] Keep any Supabase privileged secret/service-role key in server-only deployment or provisioning environments. It must never appear in `NEXT_PUBLIC_*`, browser bundles, responses, logs, or Git.
-- [ ] Prefer user-scoped Supabase calls with RLS. Restrict privileged provisioning and scheduler routines separately; cron does not need a public unauthenticated endpoint.
-- [ ] Apply migrations reproducibly and document their order. Generate types after the final schema changes. Never silently rely on unrecorded dashboard edits.
-- [ ] Set Auth site/redirect URLs for localhost and final deployment; test invitation continuation after sign-in on the deployed domain.
-- [ ] Configure private buckets, MIME/size rules, file access policies, reviewer grants, and cron jobs in the release environment.
-- [ ] Ensure authenticated agreement/evidence responses are not publicly cached. Keep participant data out of public analytics and error logs.
-- [ ] Run dependency install, lint, type check, focused tests, and production build using documented package scripts.
-- [ ] Verify HTTPS camera/file behavior on a phone; keep manual verification available for unsupported scanning.
-- [ ] Check scheduler last-success/failure status and prove retries are safe. Show a truthful pending state if processing is delayed.
-- [ ] README explains setup, commands, migrations/seeding, team assignments, known limitations, deployed URL, and the simulated financial model.
-- [ ] Final Git diff and secret check pass; all demo-critical work is committed and pushed by the team; release URL is reachable by judges.
-
-## 11. Risks and fallback actions
-
-| Risk | Action |
-| --- | --- |
-| Five developers build incompatible screens/data | Shared schema, operation contracts, and design primitives by T+2; integration at T+6/T+12/T+18 |
-| Multi-borrower arithmetic or consent bugs | Central integer allocation, immutable accepted split, all-party approval tests |
-| Refund races with claims/cancellation | One locked database transaction per transition, idempotency and unique settlement |
-| Auth/email delays during presentation | Preverified demo users, independent sessions, secure copyable links |
-| QR camera unavailable | Manual code using the same server-side verification rules |
-| Cron unavailable or misconfigured | Resolve at T+2; use a documented authenticated scheduled worker invoking the same bounded routine if necessary. No browser-only refunds |
-| Reviewer cannot decide from evidence | Request additional documents; keep restricted and show a clear unresolved state |
-| Storage/document preview takes too long | Reliable private image/PDF upload and authorized download first; rich preview later |
-| App feels like disconnected hackathon screens | Shared shell, typography, green palette, amount/status components and one canonical agreement overview |
-| Time pressure near submission | Feature freeze T+18; retain the working preview; cut cosmetic extras before correctness |
-
-## 12. Engineering references
-
-The architecture above is Pact's proposed implementation using the documented primitives; the services do not supply this agreement/ledger/dispute workflow automatically. Recheck version-specific setup when scaffolding.
-
-- [Next.js authentication and per-operation authorization](https://nextjs.org/docs/app/guides/authentication)
-- [Supabase SSR clients and identity verification](https://supabase.com/docs/guides/auth/server-side/creating-a-client?framework=nextjs)
-- [Supabase database functions and function security](https://supabase.com/docs/guides/database/functions)
-- [Supabase Storage access control](https://supabase.com/docs/guides/storage/security/access-control)
-- [Supabase private file downloads](https://supabase.com/docs/guides/storage/serving/downloads)
-- [Supabase Cron](https://supabase.com/docs/guides/cron)
-- [PostgREST transaction behavior](https://docs.postgrest.org/en/stable/references/transactions.html)
-- [PostgreSQL explicit locking](https://www.postgresql.org/docs/current/explicit-locking.html)
-- [Wise Design: visual reference for the proposed product direction](https://wise.design/)
-
-The personal `grill-me`/`grilling` skills were used to settle this plan and are installed outside this repository. Do not copy them into the app.
-
-## 13. Completion record
-
-Update this section as the sprint progresses.
-
-| Checkpoint | Status | Evidence / blocker |
-| --- | --- | --- |
-| Plan and ownership agreed | Complete | Product rules agreed in planning; assignments recorded above |
-| Local project foundation | Complete | Pinned dependencies, team folders, client factories, local Supabase config, CI, passing project checks and local page/style smoke check; no product features |
-| Shared backend / first preview | Not started | Supabase project provisioning, schema/contracts, authenticated flows and Vercel preview remain team tasks |
-| Successful exchange integrated | Not started | |
-| Multi-borrower dispute integrated | Not started | |
-| Security and money checks | Not started | |
-| Release and rehearsal | Not started | |
-| Hackathon submission | Not started | |
+Pending backend integration: authenticated evidence gateway, authoritative baseline/return operations, shared multi-user persistence, signed downloads and server deadline processing. Arrival records do not release advances; the separate accepted advance/payment workflow remains with the relevant team workstreams. See `src/features/handover/IMPLEMENTATION.md` for module handoffs.

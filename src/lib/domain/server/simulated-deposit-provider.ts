@@ -11,7 +11,7 @@ import { mutationInputSchema, participantIdSchema } from "../validation";
 
 /** Narrow transport boundary until real Supabase database types are generated.
  * Wrap client.rpc(name, { p_input: input }) in the composition root. Do not cast
- * the empty generated Database type or use a privileged client for user operations.
+ * the incomplete hand-maintained Database type or use a privileged client for user operations.
  */
 export type FundingRpc = (
   name:

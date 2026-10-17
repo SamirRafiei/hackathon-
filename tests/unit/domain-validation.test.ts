@@ -24,7 +24,7 @@ const terms = {
     },
   ],
   policyVersion: "pact-v1",
-  inspectionHours: 24,
+  inspectionHours: 48,
   anyBorrowerMayExchange: true,
 };
 describe("shared domain validation", () => {

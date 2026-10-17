@@ -58,6 +58,13 @@ async function fundingCall(
   );
   return result.rows[0].result;
 }
+async function setupCall(name: string, input: object) {
+  const result = await db.query<{ result: Record<string, unknown> }>(
+    `select public.${name}($1::jsonb) as result`,
+    [JSON.stringify(input)],
+  );
+  return result.rows[0].result;
+}
 function successful(result: FundingResult) {
   if (!result.ok) throw new Error(result.error.code);
   return result.data;
@@ -155,7 +162,7 @@ async function secureForSettlement(
   state: "inspecting" | "disputed" | "settling" = "inspecting",
   expired = false,
 ) {
-  const returnTime = expired ? "now()-interval '25 hours'" : "now()";
+  const returnTime = expired ? "now()-interval '49 hours'" : "now()";
   await db.exec(`reset role;
     insert into public.operation_requests(
       id,agreement_id,actor_scope,operation,idempotency_key,payload_hash,status,result,completed_at
@@ -182,7 +189,7 @@ async function secureForSettlement(
     update public.contributions set state='secured',secured_minor=amount_minor
       where agreement_id='${agreement}';
     update public.agreements set state='${state}',terms_frozen_at=now(),handover_at=${returnTime},
-      returned_at=${returnTime},inspection_deadline=${returnTime}+interval '24 hours'
+      returned_at=${returnTime},inspection_deadline=${returnTime}+interval '48 hours'
       where id='${agreement}';`);
 }
 async function addProposal(
@@ -267,9 +274,14 @@ beforeAll(async () => {
   db = new PGlite();
   await db.exec(bootstrap);
   const directory = new URL("../../supabase/migrations/", import.meta.url);
-  for (const file of (await readdir(directory))
+  const migrations = (await readdir(directory))
     .filter((file) => file.endsWith(".sql"))
-    .sort()) {
+    .sort();
+  const versions = migrations.map((file) => file.split("_")[0]);
+  if (new Set(versions).size !== versions.length) {
+    throw new Error("Duplicate migration version");
+  }
+  for (const file of migrations) {
     await db.exec(await readFile(new URL(file, directory), "utf8"));
   }
   await db.exec(`begin;
@@ -464,6 +476,169 @@ describe("migration and access foundation", () => {
   });
 });
 
+describe("authenticated agreement setup", () => {
+  const newAgreementInput = (idempotencyKey = "create-one") => ({
+    assetType: "APARTMENT",
+    title: "Flat deposit",
+    address: "10 Example Street",
+    tenantEmail: "borrower@example.com",
+    startDate: "2026-11-01",
+    endDate: "2027-10-31",
+    amountMinor: "125000",
+    terms: "Return the property in the condition recorded at handover.",
+    idempotencyKey,
+  });
+
+  it("creates a profile only for a signed-in verified user", async () => {
+    const callProfile = async (name: string | null) => {
+      const result = await db.query<{ result: Record<string, unknown> }>(
+        "select public.ensure_profile($1::text) as result",
+        [name],
+      );
+      return result.rows[0].result;
+    };
+    expect(await callProfile(null)).toMatchObject({
+      ok: false,
+      error: { code: "not_authenticated" },
+    });
+    await asUser(uid(7));
+    expect(await callProfile("Unverified")).toMatchObject({
+      ok: false,
+      error: { code: "verified_email_required" },
+    });
+    await db.exec("reset role");
+    await asUser(borrower);
+    expect(await callProfile("Changed name")).toMatchObject({
+      ok: true,
+    });
+    await db.exec("reset role");
+    expect(
+      (
+        await db.query(
+          `select display_name from public.profiles where id='${borrower}'`,
+        )
+      ).rows,
+    ).toEqual([{ display_name: "borrower" }]);
+  });
+
+  it("creates an owner-bound agreement and replays creation idempotently", async () => {
+    await asUser(owner);
+    const input = newAgreementInput();
+    const first = await setupCall("create_agreement", input);
+    expect(first).toMatchObject({ ok: true, replayed: false });
+    const data = first.data as Record<string, unknown>;
+    expect(data.invitationToken).toEqual(expect.any(String));
+    expect(data.invitationExpiresAt).toEqual(expect.any(String));
+    const replay = await setupCall("create_agreement", input);
+    expect(replay).toEqual({ ...first, replayed: true });
+    await db.exec("reset role");
+    expect(await count("agreements")).toBe(3);
+    expect(await count("agreement_versions")).toBe(2);
+    expect(await count("acceptances")).toBe(1);
+    expect(await count("invitations")).toBe(1);
+    expect(await count("audit_events")).toBe(1);
+  });
+
+  it("rejects unauthenticated creation, invalid inputs, and key reuse with changed data", async () => {
+    expect(
+      await setupCall("create_agreement", newAgreementInput()),
+    ).toMatchObject({
+      ok: false,
+      error: { code: "not_authenticated" },
+    });
+    await asUser(owner);
+    expect(
+      await setupCall("create_agreement", {
+        ...newAgreementInput(),
+        amountMinor: "0",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "validation_failed" } });
+    const first = await setupCall(
+      "create_agreement",
+      newAgreementInput("same-key"),
+    );
+    expect(first.ok).toBe(true);
+    expect(
+      await setupCall("create_agreement", {
+        ...newAgreementInput("same-key"),
+        title: "Changed terms",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "idempotency_conflict" } });
+  });
+
+  it("limits invitation claims to the invited verified email and accepts only the published version", async () => {
+    await asUser(owner);
+    const created = await setupCall("create_agreement", newAgreementInput());
+    const createdData = created.data as Record<string, unknown>;
+    const invitationToken = createdData.invitationToken as string;
+    await db.exec("reset role");
+    await asUser(stranger);
+    expect(
+      await setupCall("claim_invitation", {
+        invitationToken,
+        idempotencyKey: "wrong-email",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "invitation_invalid" } });
+    await db.exec("reset role");
+    await asUser(borrower);
+    const claimed = await setupCall("claim_invitation", {
+      invitationToken,
+      idempotencyKey: "claim-once",
+    });
+    expect(claimed).toMatchObject({ ok: true, replayed: false });
+    expect(
+      await setupCall("claim_invitation", {
+        invitationToken,
+        idempotencyKey: "claim-once",
+      }),
+    ).toEqual({ ...claimed, replayed: true });
+    const claimedData = claimed.data as Record<string, unknown>;
+    const acceptInput = {
+      agreementId: createdData.agreementId,
+      versionId: createdData.versionId,
+      expectedRevision: claimedData.revision,
+      idempotencyKey: "accept-once",
+    };
+    const accepted = await setupCall("accept_agreement_version", acceptInput);
+    expect(accepted).toMatchObject({
+      ok: true,
+      replayed: false,
+      data: { agreement: { state: "awaiting_funding" } },
+    });
+    expect(await setupCall("accept_agreement_version", acceptInput)).toEqual({
+      ...accepted,
+      replayed: true,
+    });
+    await db.exec("reset role");
+    expect(await count("acceptances")).toBe(2);
+    expect(await count("audit_events")).toBe(3);
+  });
+
+  it("keeps terms pending until the invited party joins and rejects stale acceptance", async () => {
+    await asUser(owner);
+    const created = await setupCall("create_agreement", newAgreementInput());
+    const data = created.data as Record<string, unknown>;
+    const accepted = await setupCall("accept_agreement_version", {
+      agreementId: data.agreementId,
+      versionId: data.versionId,
+      expectedRevision: data.revision,
+      idempotencyKey: "owner-acceptance",
+    });
+    expect(accepted).toMatchObject({
+      ok: true,
+      data: { agreement: { state: "awaiting_acceptance" } },
+    });
+    expect(
+      await setupCall("accept_agreement_version", {
+        agreementId: data.agreementId,
+        versionId: data.versionId,
+        expectedRevision: data.revision,
+        idempotencyKey: "stale-acceptance",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "stale_revision" } });
+  });
+});
+
 describe("database integrity", () => {
   it("matches TypeScript largest-remainder results", async () => {
     for (const amount of [3, 101, 25000, 100000000]) {
@@ -586,13 +761,13 @@ describe("database integrity", () => {
       "submitted_evidence_immutable",
     );
   });
-  it("enforces the 24-hour policy and exactly-once receipt timestamp", async () => {
+  it("enforces the 48-hour policy and exactly-once return timestamp", async () => {
     await rejected(
       `update public.agreements set handover_at=now(),returned_at=now(),inspection_deadline=now()+interval '1 hour' where id='${agreement}'`,
       "check constraint",
     );
     await db.exec(
-      `update public.agreements set handover_at=now(),returned_at=now(),inspection_deadline=now()+interval '24 hours' where id='${agreement}'`,
+      `update public.agreements set handover_at=now(),returned_at=now(),inspection_deadline=now()+interval '48 hours' where id='${agreement}'`,
     );
     await rejected(
       `update public.agreements set returned_at=returned_at+interval '1 second' where id='${agreement}'`,

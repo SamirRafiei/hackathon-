@@ -1,9 +1,9 @@
 /** Hand-authored domain contracts, NOT generated database row types. */
 export const PACT_POLICY = {
   version: "pact-v1",
-  inspectionHours: 24,
+  inspectionHours: 48,
   negotiationHours: 24,
-  unacknowledgedReturnHours: 24,
+  unacknowledgedReturnHours: 48,
   invitationHours: 24,
   challengeMinutes: 10,
   maxBorrowers: 20,
@@ -88,7 +88,7 @@ export interface AgreementTerms {
   dueAt: UtcTimestamp;
   borrowers: BorrowerTerms[];
   policyVersion: "pact-v1";
-  inspectionHours: 24;
+  inspectionHours: 48;
   anyBorrowerMayExchange: true;
 }
 export interface AgreementVersionSnapshot extends Omit<

@@ -61,7 +61,7 @@ export const agreementTermsSchema = z
       .min(1)
       .max(PACT_POLICY.maxBorrowers),
     policyVersion: z.literal(PACT_POLICY.version),
-    inspectionHours: z.literal(24),
+    inspectionHours: z.literal(48),
     anyBorrowerMayExchange: z.literal(true),
   })
   .strict()

@@ -52,7 +52,7 @@ create table public.agreements (
   unique (id, owner_id),
   check ((returned_at is null and inspection_deadline is null) or
     (returned_at is not null and inspection_deadline is not null and
-     inspection_deadline = returned_at + interval '24 hours')),
+     inspection_deadline = returned_at + interval '48 hours')),
   check (returned_at is null or handover_at is not null),
   check (state = 'draft' or current_version_id is not null),
   check (state not in ('active', 'return_requested', 'inspecting', 'disputed', 'settling', 'completed') or handover_at is not null),
@@ -94,7 +94,7 @@ create table public.agreement_versions (
   starts_at timestamptz not null,
   due_at timestamptz not null check (due_at > starts_at),
   policy_version text not null default 'pact-v1' check (policy_version = 'pact-v1'),
-  inspection_hours integer not null default 24 check (inspection_hours = 24),
+  inspection_hours integer not null default 48 check (inspection_hours = 48),
   any_borrower_may_exchange boolean not null default true check (any_borrower_may_exchange),
   published_at timestamptz not null default now(),
   created_txid bigint not null default txid_current(),
