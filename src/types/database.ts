@@ -1,4 +1,4 @@
-/** Generated-function subset for the agreement setup RPC migration. */
+/** Hand-maintained schema subset for account setup and private evidence reads. */
 export type Json =
   | string
   | number
@@ -31,6 +31,24 @@ type AgreementState =
 export type Database = {
   public: {
     Tables: {
+      evidence_files: Table<{
+        id: string;
+        agreement_id: string;
+        uploader_id: string;
+        actual_participant_id: string | null;
+        phase: "item" | "collection" | "return" | "dispute";
+        exchange_event_id: string | null;
+        dispute_id: string | null;
+        case_id: string | null;
+        bucket_id: "pact-evidence";
+        object_path: string;
+        mime_type: "image/jpeg" | "image/png" | "image/webp" | "application/pdf";
+        size_bytes: number;
+        sha256: string;
+        caption: string | null;
+        created_at: string;
+        submitted_at: string | null;
+      }>;
       agreements: Table<{
         id: string;
         owner_id: string;
