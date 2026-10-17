@@ -15,7 +15,11 @@ export type AgreementStatus =
 export type LedgerEntry = {
   id: string;
   operationId: string;
-  account: "renter_available" | "agreement_reserved" | "renter_refund" | "landlord_allocation";
+  account:
+    | "renter_available"
+    | "agreement_reserved"
+    | "renter_refund"
+    | "landlord_allocation";
   amountMinor: number;
   currency: typeof DEMO_CURRENCY;
   createdAt: string;
@@ -62,7 +66,12 @@ export type DemoSnapshot = {
 const entrySchema = z.object({
   id: z.string(),
   operationId: z.string(),
-  account: z.enum(["renter_available", "agreement_reserved", "renter_refund", "landlord_allocation"]),
+  account: z.enum([
+    "renter_available",
+    "agreement_reserved",
+    "renter_refund",
+    "landlord_allocation",
+  ]),
   amountMinor: z.number().int(),
   currency: z.literal(DEMO_CURRENCY),
   createdAt: z.string(),
@@ -149,7 +158,9 @@ export function createInitialDemoSnapshot(): DemoSnapshot {
 }
 
 export function actorForId(id: DemoSnapshot["activeActorId"]): PactActor {
-  return id === demoActors.landlord.id ? demoActors.landlord : demoActors.tenant;
+  return id === demoActors.landlord.id
+    ? demoActors.landlord
+    : demoActors.tenant;
 }
 
 function newId(prefix: string) {
@@ -181,20 +192,30 @@ function requireRole(actor: PactActor, role: PactActor["role"]) {
   }
 }
 
-export function acceptTerms(snapshot: DemoSnapshot, actor: PactActor): DemoSnapshot {
+export function acceptTerms(
+  snapshot: DemoSnapshot,
+  actor: PactActor,
+): DemoSnapshot {
   if (snapshot.agreement.status !== "AWAITING_ACCEPTANCE") {
     throw new Error("These terms are no longer awaiting acceptance.");
   }
   const acceptedBy = { ...snapshot.agreement.acceptedBy, [actor.role]: true };
   let agreement: DemoAgreement = { ...snapshot.agreement, acceptedBy };
-  agreement = recordActivity(agreement, actor, "Accepted agreement version 1.0");
+  agreement = recordActivity(
+    agreement,
+    actor,
+    "Accepted agreement version 1.0",
+  );
   if (acceptedBy.landlord && acceptedBy.tenant) {
     agreement = { ...agreement, status: "AWAITING_FUNDING" };
   }
   return { ...snapshot, agreement };
 }
 
-export function fundAgreement(snapshot: DemoSnapshot, actor: PactActor): DemoSnapshot {
+export function fundAgreement(
+  snapshot: DemoSnapshot,
+  actor: PactActor,
+): DemoSnapshot {
   requireRole(actor, "tenant");
   if (snapshot.agreement.status !== "AWAITING_FUNDING") {
     throw new Error("Both parties must accept before funding.");
@@ -225,17 +246,33 @@ export function fundAgreement(snapshot: DemoSnapshot, actor: PactActor): DemoSna
     reservedMinor: snapshot.agreement.amountMinor,
     ledger: [...snapshot.agreement.ledger, ...entries],
   };
-  agreement = recordActivity(agreement, actor, "Simulated the deposit funding; funds are reserved in the demo ledger");
+  agreement = recordActivity(
+    agreement,
+    actor,
+    "Simulated the deposit funding; funds are reserved in the demo ledger",
+  );
   return { ...snapshot, agreement };
 }
 
-export function submitReturn(snapshot: DemoSnapshot, actor: PactActor): DemoSnapshot {
+export function submitReturn(
+  snapshot: DemoSnapshot,
+  actor: PactActor,
+): DemoSnapshot {
   requireRole(actor, "tenant");
   if (snapshot.agreement.status !== "FUNDED") {
-    throw new Error("The agreement must be funded before return can be recorded.");
+    throw new Error(
+      "The agreement must be funded before return can be recorded.",
+    );
   }
-  let agreement: DemoAgreement = { ...snapshot.agreement, status: "RETURN_REVIEW" };
-  agreement = recordActivity(agreement, actor, "Recorded the apartment return and started the review");
+  let agreement: DemoAgreement = {
+    ...snapshot.agreement,
+    status: "RETURN_REVIEW",
+  };
+  agreement = recordActivity(
+    agreement,
+    actor,
+    "Recorded the apartment return and started the review",
+  );
   return { ...snapshot, agreement };
 }
 
@@ -247,14 +284,24 @@ export function proposeSplit(
 ): DemoSnapshot {
   requireRole(actor, "landlord");
   const current = snapshot.agreement;
-  if (current.status !== "RETURN_REVIEW" && current.status !== "PROPOSAL_PENDING") {
+  if (
+    current.status !== "RETURN_REVIEW" &&
+    current.status !== "PROPOSAL_PENDING"
+  ) {
     throw new Error("A split can only be proposed during return review.");
   }
-  if (!Number.isSafeInteger(ownerAllocationMinor) || ownerAllocationMinor < 0 || ownerAllocationMinor > current.reservedMinor) {
-    throw new Error("The proposed allocation must be between €0 and the reserved amount.");
+  if (
+    !Number.isSafeInteger(ownerAllocationMinor) ||
+    ownerAllocationMinor < 0 ||
+    ownerAllocationMinor > current.reservedMinor
+  ) {
+    throw new Error(
+      "The proposed allocation must be between €0 and the reserved amount.",
+    );
   }
   const normalizedReason = reason.trim();
-  if (!normalizedReason) throw new Error("Add a short reason for the proposed split.");
+  if (!normalizedReason)
+    throw new Error("Add a short reason for the proposed split.");
   const version = (current.proposal?.version ?? 0) + 1;
   const proposal: SettlementProposal = {
     version,
@@ -277,7 +324,10 @@ export function proposeSplit(
   return { ...snapshot, agreement };
 }
 
-export function approveSplit(snapshot: DemoSnapshot, actor: PactActor): DemoSnapshot {
+export function approveSplit(
+  snapshot: DemoSnapshot,
+  actor: PactActor,
+): DemoSnapshot {
   requireRole(actor, "tenant");
   const current = snapshot.agreement;
   if (current.status !== "PROPOSAL_PENDING" || !current.proposal) {
@@ -319,11 +369,18 @@ export function approveSplit(snapshot: DemoSnapshot, actor: PactActor): DemoSnap
     proposal,
     ledger: [...current.ledger, ...entries],
   };
-  agreement = recordActivity(agreement, actor, `Approved split version ${proposal.version}; simulated settlement completed`);
+  agreement = recordActivity(
+    agreement,
+    actor,
+    `Approved split version ${proposal.version}; simulated settlement completed`,
+  );
   return { ...snapshot, agreement };
 }
 
-export function declineSplit(snapshot: DemoSnapshot, actor: PactActor): DemoSnapshot {
+export function declineSplit(
+  snapshot: DemoSnapshot,
+  actor: PactActor,
+): DemoSnapshot {
   requireRole(actor, "tenant");
   if (snapshot.agreement.status !== "PROPOSAL_PENDING") {
     throw new Error("There is no open split proposal to decline.");
@@ -333,11 +390,18 @@ export function declineSplit(snapshot: DemoSnapshot, actor: PactActor): DemoSnap
     status: "RETURN_REVIEW",
     proposal: null,
   };
-  agreement = recordActivity(agreement, actor, "Asked the landlord to revise the proposal; funds remain reserved");
+  agreement = recordActivity(
+    agreement,
+    actor,
+    "Asked the landlord to revise the proposal; funds remain reserved",
+  );
   return { ...snapshot, agreement };
 }
 
-export function approveFullRefund(snapshot: DemoSnapshot, actor: PactActor): DemoSnapshot {
+export function approveFullRefund(
+  snapshot: DemoSnapshot,
+  actor: PactActor,
+): DemoSnapshot {
   requireRole(actor, "landlord");
   const current = snapshot.agreement;
   if (current.status !== "RETURN_REVIEW") {
@@ -369,7 +433,11 @@ export function approveFullRefund(snapshot: DemoSnapshot, actor: PactActor): Dem
     reservedMinor: 0,
     ledger: [...current.ledger, ...entries],
   };
-  agreement = recordActivity(agreement, actor, "Approved the full renter refund; simulated settlement completed");
+  agreement = recordActivity(
+    agreement,
+    actor,
+    "Approved the full renter refund; simulated settlement completed",
+  );
   return { ...snapshot, agreement };
 }
 

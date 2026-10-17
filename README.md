@@ -80,7 +80,7 @@ The interactive demo uses the Next.js App Router, React client state, Zod to val
 | `npm run check`                                | Lint, types, formatting, unit tests, production build |
 | `npm run db:start` / `npm run db:stop`         | Start / stop local Supabase (requires Docker)         |
 | `npm run db:status`                            | Show local Supabase connection details                |
-| `npm run db:migration:new -- name`             | Create a new database migration                      |
+| `npm run db:migration:new -- name`             | Create a new database migration                       |
 | `npm run db:types`                             | Generate types from running local Supabase            |
 | `npm run db:types -- --project-id PROJECT_REF` | Generate types from an authorized hosted project      |
 
