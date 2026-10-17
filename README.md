@@ -2,7 +2,7 @@
 
 Make a pact. Keep it fair.
 
-Pact is a prototype for making rental deposits easier to understand and settle fairly. The demo starts with an apartment deposit and lets the landlord create an apartment or equipment security-deposit agreement. The tenant reviews and accepts the exact version before simulated funding, return review, and an agreed split. The broader product plan is in [plan.md](./plan.md).
+Pact is a prototype for making rental deposits easier to understand and settle fairly. The demo starts with an apartment deposit and lets the landlord create an apartment or equipment security-deposit agreement. The tenant reviews and accepts the exact version before simulated funding. Both parties acknowledge a photographed condition baseline before activation, and a photographed return starts the 48-hour review before refund or an agreed split. The broader product plan is in [plan.md](./plan.md).
 
 The idea can fit inside a banking app or another trusted host experience. This standalone prototype has no banking-provider integration and does not hold, move, or protect real money.
 
@@ -20,7 +20,7 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. The demo works without Docker, Supabase credentials, or an account. Use the landlord/tenant switcher to walk through the seeded agreement or create a local apartment/equipment agreement. Demo choices and activity are saved in that browser's local storage, so two different browsers do not share data.
+Open http://localhost:3000. The demo works without Docker, Supabase credentials, or an account. Use the landlord/tenant switcher to walk through the seeded agreement or create a local apartment/equipment agreement. Demo choices, condition records, and activity are saved in that browser's local storage. Actual photo files are stored in IndexedDB and survive reloads. Two different browsers do not share data; clearing browser storage removes the demo and its evidence.
 
 This identity switch is a demo control, not sign-in or proof of identity. Anyone can switch between the fake parties. The landing-page walkthrough stores its agreement and activity in that browser's local storage and is not an authoritative record. The separate account flow uses Supabase Auth and server-side database operations for persistent agreement setup, invited-email claiming, and acceptance. Do not use real money: simulated funding is not connected to a payment provider. A future banking-host integration must verify a signed identity assertion on the server; a browser-provided name, role, or biometric claim is not sufficient.
 
@@ -32,10 +32,10 @@ src/
   components/ui/       Shared accessible UI components
   features/
     demo/               Seeded agreement, local demo repository, interactive workflow
-    agreements/        Demo setup plus authenticated persistent setup, invitation, acceptance
-    deposits/          Deposit-provider contracts and simulated funding operations
-    handover/          Planned condition evidence, collection and return workflows
-    disputes/          Planned claims, negotiation and reviewer workspace
+    agreements/        Local demo setup form; authenticated persistence is pending
+    deposits/          Reserved for future provider, persistent funding, transaction history
+    handover/          Evidence adapters, baseline consent, return, comparison, arrival inspection
+    disputes/          Claims, negotiation, reviewer workspace
   lib/
     auth/              Identity-provider boundary; current fake demo identities
     domain/            Shared validation, agreement contracts, allocation and provider boundary
@@ -53,6 +53,20 @@ public/                Static assets
 The demo domain transitions are kept separate from the UI and persisted through a `PactRepository` interface. `LocalDemoRepository` is only for the browser demo; a future Supabase repository should enforce every mutation and read access on the server/database.
 
 **Identity boundary:** `IdentityProvider` is an integration seam, not authentication by itself. The demo provider returns fake actors. A real provider must validate the host's signed, short-lived assertion server-side and resolve the resulting identity to agreement membership. Never accept a client-selected role for real agreements.
+
+## Handover and inspection modules
+
+The agreement now includes an **Evidence for a fair exchange** section:
+
+1. Fund the accepted agreement, then switch to the owner and publish the initial condition with a photo and asset checklist.
+2. Switch to the renter and acknowledge that exact baseline. The rental activates only after both parties acknowledge it.
+3. Use **Return declaration** to record photos, location, and any checklist exceptions. The first declaration fixes one 48-hour review deadline without releasing funds.
+4. Use **Before & after** to compare the matching baseline and return; differences alone do not decide responsibility.
+5. Apartment agreements also expose a reusable **Arrival inspection** form. It records access, availability, and listing conformity. On the existing security-deposit demo it does not authorize an advance payment or change payment purpose.
+
+Evidence validation accepts JPEG/PNG/WebP photos, with PDFs limited to dispute evidence, up to 10 MB each and 12 files per record. Pending uploads block submission. Finalized records/files cannot be edited/deleted through the ordinary adapter; failed previews and uploads have retry controls. All local timestamps are demo device times, not server-verified proof.
+
+`SupabaseEvidenceStorage` is an adapter around an injected **authenticated server gateway**, not a completed backend upload service. Server preparation/finalization, authoritative baseline/return persistence, private signed downloads, and scheduled deadline refunds remain backend integration work. No uploaded file is silently sent to a hosted service. See [handover integration notes](./src/features/handover/IMPLEMENTATION.md) and [storage requirements](./src/features/handover/evidence/README.md).
 
 ## Installed toolkit
 

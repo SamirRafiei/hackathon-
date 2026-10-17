@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { demoActors } from "@/lib/auth/identity-provider";
+import { returnReviewDemoSnapshot } from "./fixtures/handover";
 import {
   DEMO_AMOUNT_MINOR,
   acceptTerms,
@@ -19,12 +20,8 @@ function acceptedSnapshot() {
   return acceptTerms(createInitialDemoSnapshot(), demoActors.tenant);
 }
 
-function fundedSnapshot() {
-  return fundAgreement(acceptedSnapshot(), demoActors.tenant);
-}
-
 function returnReviewSnapshot() {
-  return submitReturn(fundedSnapshot(), demoActors.tenant);
+  return returnReviewDemoSnapshot();
 }
 
 function expectBalancedLedger(
