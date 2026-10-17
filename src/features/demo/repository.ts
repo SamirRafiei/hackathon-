@@ -1,7 +1,4 @@
-import {
-  demoSnapshotSchema,
-  type DemoSnapshot,
-} from "@/features/demo/model";
+import { demoSnapshotSchema, type DemoSnapshot } from "@/features/demo/model";
 
 /** Storage boundary. A server-backed Supabase repository can implement this later. */
 export interface PactRepository {
