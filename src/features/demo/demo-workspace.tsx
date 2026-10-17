@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -240,10 +242,14 @@ export default function DemoWorkspace() {
     <main className="pact-shell">
       <header className="topbar">
         <a aria-label="Pact home" className="brand" href="#top">
-          <span className="brand-mark">
-            <span />
-          </span>
-          <span>pact</span>
+          <Image
+            src="/brand/pact.svg"
+            alt="Pact"
+            width={165}
+            height={68}
+            className="brand-logo"
+            preload
+          />
         </a>
         <nav aria-label="Main navigation" className="main-nav">
           <a className="nav-link nav-link-active" href="#agreement">
