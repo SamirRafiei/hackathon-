@@ -4,6 +4,8 @@ import { AcceptAgreement } from "@/features/agreements/components/accept-agreeme
 import { signOut } from "@/features/auth/server/actions";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 function money(minor: number | string, currency: string) {
   return new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(
     Number(minor) / 100,

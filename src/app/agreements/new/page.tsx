@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { AuthenticatedAgreementForm } from "@/features/agreements/components/authenticated-agreement-form";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 export default async function NewAgreementPage() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
