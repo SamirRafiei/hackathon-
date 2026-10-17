@@ -76,16 +76,6 @@ export function HandoverWorkspace(props: HandoverWorkspaceProps) {
           comes back. Submitted records cannot be edited through the app.
         </p>
       </div>
-      <p
-        role="note"
-        className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-950"
-      >
-        Local demo evidence · Photos are stored in this browser using IndexedDB.
-        They do not sync between devices and the identity switch is not
-        authentication. Do not upload real private documents. The 48-hour
-        deadline uses the demo device clock; server deadline processing is not
-        connected.
-      </p>
       <fieldset className="flex flex-wrap gap-2">
         <legend className="sr-only">Condition record views</legend>
         {tabs.map(([id, label]) => (

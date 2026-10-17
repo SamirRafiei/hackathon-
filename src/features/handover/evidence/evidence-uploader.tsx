@@ -124,7 +124,8 @@ export function EvidenceUploader({
         {storage.mode === "browser-demo" ? (
           <p className="mt-1 text-xs text-amber-800">
             Browser demo: files stay on this browser and are not shared with
-            other devices.
+            other devices. Demo identities are not authentication. Use sample
+            photos; do not upload real private documents.
           </p>
         ) : null}
       </div>

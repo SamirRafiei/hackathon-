@@ -260,7 +260,8 @@ function ReturnForm(props: ReturnPanelProps & { baseline: BaselineRecord }) {
           Add photos and confirm what you returned against baseline version{" "}
           {props.baseline.version}. Submitting starts the 48-hour inspection
           window; it does not prove the owner received the item or release the
-          deposit.
+          deposit. This demo uses the device clock; server deadline processing
+          is not connected.
         </p>
       </div>
       <form className="space-y-5" onSubmit={submit}>
