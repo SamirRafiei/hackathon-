@@ -1,6 +1,11 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { LocalDemoRepository } from "@/features/demo/repository";
-import { createInitialDemoSnapshot } from "@/features/demo/model";
+import {
+  acceptTerms,
+  createInitialDemoSnapshot,
+  fundAgreement,
+} from "@/features/demo/model";
+import { demoActors } from "@/lib/auth/identity-provider";
 
 describe("LocalDemoRepository", () => {
   beforeEach(() => {
@@ -25,6 +30,25 @@ describe("LocalDemoRepository", () => {
       "pact-demo-v1",
       JSON.stringify({ activeActorId: "other" }),
     );
+    expect(await repository.load()).toBeNull();
+  });
+
+  it("rejects snapshots with tampered financial state", async () => {
+    const repository = new LocalDemoRepository();
+    const funded = fundAgreement(
+      acceptTerms(createInitialDemoSnapshot(), demoActors.tenant),
+      demoActors.tenant,
+    );
+    const tampered = {
+      ...funded,
+      agreement: {
+        ...funded.agreement,
+        reservedMinor: 1,
+      },
+    };
+
+    window.localStorage.setItem("pact-demo-v1", JSON.stringify(tampered));
+
     expect(await repository.load()).toBeNull();
   });
 
