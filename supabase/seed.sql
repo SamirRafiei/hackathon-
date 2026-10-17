@@ -1,0 +1,1 @@
+-- Intentionally empty: add non-secret development fixtures after schema migrations.
