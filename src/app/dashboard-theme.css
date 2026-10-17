@@ -1,0 +1,966 @@
+/* Wise product-language treatment. Scoped to the demo dashboard, not auth flows. */
+@font-face {
+  font-family: "Pact Inter";
+  src: url("/fonts/inter/InterVariable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+main.pact-shell {
+  --dashboard-ink: #163300;
+  --dashboard-body: #454745;
+  --dashboard-secondary: #636760;
+  --dashboard-line: #e2e6df;
+  --dashboard-surface: #f2f5ef;
+  --dashboard-accent: #9fe870;
+  --dashboard-radius: 16px;
+  background: #f7f9f5;
+  color: var(--dashboard-body);
+  font-family: "Pact Inter", "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: -0.006em;
+  font-optical-sizing: auto;
+  font-feature-settings:
+    "liga" 1,
+    "calt" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+.pact-shell :is(button, input, select, textarea) {
+  font-family: inherit;
+}
+
+.pact-shell .topbar {
+  min-height: 88px;
+  height: auto;
+  background: #fff;
+  border-color: var(--dashboard-line);
+  padding: 16px max(32px, calc((100vw - 1200px) / 2));
+}
+
+.pact-shell .main-nav {
+  min-height: 56px;
+  gap: 32px;
+}
+.pact-shell .nav-link {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--dashboard-secondary);
+}
+.pact-shell .nav-link-active {
+  color: var(--dashboard-ink);
+}
+.pact-shell .nav-link-active::after {
+  background: var(--dashboard-ink);
+  height: 3px;
+}
+.pact-shell .topbar-demo {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.pact-shell .topbar-right {
+  gap: 16px;
+}
+.pact-shell .identity-switch {
+  border-radius: 999px;
+  padding: 4px;
+  background: #f2f4ef;
+}
+.pact-shell .identity-option {
+  min-height: 40px;
+  padding: 6px 12px 6px 6px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 999px;
+}
+.pact-shell .identity-selected {
+  box-shadow: none;
+  color: var(--dashboard-ink);
+}
+.pact-shell .avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.pact-shell .account-entry {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dashboard-ink);
+}
+
+.pact-shell .workspace {
+  width: min(1200px, calc(100% - 64px));
+  padding: 48px 0 32px;
+}
+.pact-shell .welcome-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.pact-shell .eyebrow {
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--dashboard-secondary);
+}
+.pact-shell .welcome-row h1 {
+  font-size: clamp(32px, 3.5vw, 44px);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  color: var(--dashboard-ink);
+}
+.pact-shell .welcome-copy {
+  max-width: 540px;
+  margin-top: 16px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--dashboard-secondary);
+}
+.pact-shell .reset-button {
+  min-height: 48px;
+  justify-content: center;
+  padding: 12px 20px;
+  gap: 8px;
+  border-radius: 999px;
+  border-color: var(--dashboard-line);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--dashboard-ink);
+  white-space: nowrap;
+}
+.pact-shell .welcome-row > .reset-button:first-of-type {
+  background: var(--dashboard-accent);
+  border-color: var(--dashboard-accent);
+}
+.pact-shell .welcome-row > .reset-button:first-of-type:hover {
+  background: #b6f093;
+  border-color: #b6f093;
+}
+
+.pact-shell .demo-notice {
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  border-radius: var(--dashboard-radius);
+  background: #edf5e8;
+  border-color: #e0ecd9;
+}
+.pact-shell .demo-notice-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #dfedcf;
+  color: var(--dashboard-ink);
+}
+.pact-shell .demo-notice strong {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--dashboard-ink);
+}
+.pact-shell .demo-notice p {
+  font-size: 14px;
+  line-height: 20px;
+  color: #52634a;
+}
+.pact-shell .demo-notice-tag {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.pact-shell .inline-notice {
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.pact-shell .dashboard-grid {
+  grid-template-columns: minmax(0, 1.8fr) minmax(320px, 0.9fr);
+  gap: 24px;
+}
+.pact-shell
+  :is(
+    .agreement-card,
+    .next-card,
+    .details-card,
+    .activity-card,
+    .ledger-card
+  ) {
+  border-color: var(--dashboard-line);
+  border-radius: var(--dashboard-radius);
+  box-shadow: none;
+}
+.pact-shell .agreement-card {
+  width: 100%;
+  min-width: 0;
+}
+
+.pact-shell .agreement-card-top {
+  gap: 12px;
+  padding: 20px 24px;
+}
+.pact-shell .agreement-kind {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--dashboard-secondary);
+}
+.pact-shell .kind-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.pact-shell .status-pill {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  padding: 8px 12px;
+  color: #526046;
+  border-color: #e2e8da;
+}
+.pact-shell .agreement-heading-row {
+  align-items: flex-start;
+  gap: 16px;
+  padding: 24px;
+}
+.pact-shell .section-kicker {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  color: var(--dashboard-secondary);
+}
+.pact-shell .agreement-heading-row h2 {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  color: var(--dashboard-ink);
+}
+.pact-shell .address-line {
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--dashboard-secondary);
+}
+.pact-shell .terms-readonly {
+  max-width: 110px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  color: var(--dashboard-secondary);
+  text-align: right;
+}
+.pact-shell .amount-block {
+  margin: 0 24px;
+  padding: 24px;
+  gap: 20px;
+  border-radius: 12px;
+  background: var(--dashboard-surface);
+}
+.pact-shell .amount-label {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--dashboard-secondary);
+}
+.pact-shell .amount-value {
+  overflow-wrap: anywhere;
+  font-size: clamp(36px, 4vw, 48px);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+  color: var(--dashboard-ink);
+  font-variant-numeric: tabular-nums;
+}
+.pact-shell .amount-side {
+  padding-left: 20px;
+  gap: 12px;
+  border-color: #d7ded1;
+}
+.pact-shell .amount-side-icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.pact-shell .amount-side-title {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--dashboard-ink);
+  font-variant-numeric: tabular-nums;
+}
+.pact-shell .amount-side-caption {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--dashboard-secondary);
+}
+
+.pact-shell .parties-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+  margin: 24px 24px 0;
+}
+.pact-shell .party-card {
+  width: 100%;
+  min-height: 104px;
+  gap: 12px;
+  padding: 16px 12px;
+  border-radius: 12px;
+}
+.pact-shell .party-card-active {
+  border-color: #8ab872;
+  background: #f5faef;
+}
+.pact-shell .party-connector {
+  width: 20px;
+}
+.pact-shell .party-avatar {
+  width: 36px;
+  height: 36px;
+  font-size: 12px;
+}
+.pact-shell .party-label {
+  font-size: 10px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--dashboard-secondary);
+}
+.pact-shell .party-info strong {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--dashboard-ink);
+}
+.pact-shell .acceptance {
+  font-size: 11px;
+  line-height: 16px;
+}
+.pact-shell .current-identity {
+  font-size: 9px;
+  line-height: 12px;
+  font-weight: 600;
+  top: -7px;
+  padding: 2px 6px;
+}
+.pact-shell .terms-row {
+  margin: 24px 24px 0;
+  padding-top: 20px;
+  align-items: flex-start;
+}
+.pact-shell .terms-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+.pact-shell .terms-copy strong {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+.pact-shell .terms-copy span {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dashboard-secondary);
+}
+.pact-shell .terms-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--dashboard-body);
+}
+.pact-shell .terms-text summary {
+  font-size: 14px;
+  font-weight: 600;
+}
+.pact-shell .progress-section {
+  margin: 24px 24px 0;
+}
+.pact-shell .progress-heading {
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+}
+.pact-shell .progress-count {
+  font-weight: 600;
+}
+.pact-shell .progress-count span {
+  font-weight: 400;
+}
+.pact-shell .progress-track {
+  height: 6px;
+  margin-top: 12px;
+}
+.pact-shell .progress-track span {
+  background: var(--dashboard-ink);
+}
+.pact-shell .progress-labels {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dashboard-secondary);
+}
+
+.pact-shell .action-area {
+  margin: 24px;
+  padding: 20px;
+  border-radius: 12px;
+  background: #fff;
+}
+.pact-shell .panel-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+.pact-shell :is(.action-panel-heading strong, .panel-heading strong) {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+  color: var(--dashboard-ink);
+}
+.pact-shell :is(.action-panel-heading, .panel-heading) span:not(.panel-icon) {
+  font-size: 14px;
+  line-height: 21px;
+  color: var(--dashboard-secondary);
+}
+.pact-shell .primary-action {
+  min-height: 48px;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 999px;
+  background: var(--dashboard-accent);
+  color: var(--dashboard-ink);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.pact-shell .primary-action:hover {
+  background: #b6f093;
+  transform: none;
+}
+.pact-shell .primary-action:disabled {
+  background: #e9ece5;
+  color: #788173;
+}
+.pact-shell .secondary-action {
+  min-height: 48px;
+  padding: 12px 24px;
+  border-radius: 999px;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.pact-shell .text-action {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+.pact-shell .acceptance-check {
+  font-size: 14px;
+  line-height: 22px;
+}
+.pact-shell .acceptance-check input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: var(--dashboard-ink);
+}
+.pact-shell .proposal-form :is(label, input, textarea),
+.pact-shell .split-summary {
+  font-size: 14px;
+  line-height: 21px;
+}
+.pact-shell .proposal-panel blockquote {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.pact-shell .proposal-values strong {
+  font-size: 22px;
+  font-weight: 600;
+}
+.pact-shell .settled-panel {
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.pact-shell .side-column {
+  gap: 24px;
+}
+.pact-shell .next-card {
+  padding: 24px;
+}
+.pact-shell .side-card-icon,
+.pact-shell .details-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+.pact-shell :is(.next-card, .details-card, .activity-card, .ledger-card) h2 {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 28px;
+  letter-spacing: -0.02em;
+  color: var(--dashboard-ink);
+}
+.pact-shell .next-copy {
+  margin: 12px 0 20px;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dashboard-secondary);
+}
+.pact-shell .next-step-box {
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--dashboard-surface);
+}
+.pact-shell .next-step-top {
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.pact-shell .next-step-box > strong {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 21px;
+  color: var(--dashboard-ink);
+}
+.pact-shell .next-step-person {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dashboard-secondary);
+}
+.pact-shell .security-points {
+  gap: 16px;
+  margin-top: 24px;
+}
+.pact-shell .security-points > div > span {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+.pact-shell .security-points strong {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--dashboard-body);
+}
+.pact-shell .security-points small {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dashboard-secondary);
+}
+.pact-shell .details-card {
+  padding: 24px 24px 0;
+  overflow: hidden;
+}
+.pact-shell .details-heading-row {
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.pact-shell .detail-line {
+  gap: 16px;
+  padding: 14px 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--dashboard-secondary);
+}
+.pact-shell .detail-line strong {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  text-align: right;
+  color: var(--dashboard-ink);
+}
+.pact-shell .details-footer {
+  margin: 8px -24px 0;
+  padding: 16px 24px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+}
+
+.pact-shell .activity-card {
+  margin-top: 24px;
+  padding: 24px 24px 0;
+}
+.pact-shell .activity-count,
+.pact-shell .ledger-badge {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  padding: 6px 10px;
+}
+.pact-shell .activity-item {
+  padding: 16px 0;
+  gap: 12px;
+}
+.pact-shell .activity-body strong {
+  font-size: 14px;
+  line-height: 21px;
+  font-weight: 600;
+  color: var(--dashboard-ink);
+}
+.pact-shell .activity-body > span {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dashboard-secondary);
+}
+.pact-shell .activity-item time {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dashboard-secondary);
+}
+.pact-shell .activity-footer {
+  margin-right: -24px;
+  margin-left: -24px;
+  padding: 16px 24px;
+}
+.pact-shell .activity-footer > span,
+.pact-shell .activity-footer button {
+  font-size: 12px;
+  line-height: 18px;
+}
+.pact-shell .ledger-card {
+  margin-top: 24px;
+  padding: 24px;
+}
+.pact-shell .ledger-empty strong {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+.pact-shell .ledger-empty small {
+  font-size: 14px;
+  line-height: 21px;
+}
+.pact-shell .ledger-entry {
+  gap: 12px;
+  padding: 16px 0;
+}
+.pact-shell .ledger-entry > div strong {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 21px;
+}
+.pact-shell .ledger-entry > div small {
+  font-size: 12px;
+  line-height: 18px;
+}
+.pact-shell .ledger-amount {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+  font-variant-numeric: tabular-nums;
+}
+.pact-shell .page-footer {
+  font-size: 12px;
+  line-height: 18px;
+  padding-top: 24px;
+}
+.pact-shell #condition-records h2 {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 36px;
+  letter-spacing: -0.025em;
+  color: var(--dashboard-ink);
+}
+.pact-shell #condition-records h3 {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 28px;
+  letter-spacing: -0.02em;
+  color: var(--dashboard-ink);
+}
+.pact-shell .setup-card {
+  padding: 24px;
+  border-radius: 16px;
+}
+.pact-shell .setup-card h2 {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 32px;
+}
+.pact-shell .setup-form :is(label, input, select, textarea) {
+  font-size: 14px;
+  line-height: 22px;
+}
+.pact-shell .setup-actions button {
+  min-height: 48px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@media (max-width: 1060px) {
+  .pact-shell .topbar-demo {
+    display: none;
+  }
+  .pact-shell .topbar {
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+  .pact-shell .main-nav {
+    margin-left: 16px;
+    gap: 24px;
+  }
+  .pact-shell .workspace {
+    width: calc(100% - 48px);
+  }
+  .pact-shell .welcome-row {
+    align-items: start;
+  }
+  .pact-shell .dashboard-grid {
+    grid-template-columns: minmax(0, 1.6fr) minmax(290px, 0.9fr);
+  }
+  .pact-shell .amount-block {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pact-shell .amount-side {
+    border-left: 0;
+    border-top: 1px solid #d7ded1;
+    padding-left: 0;
+    padding-top: 16px;
+  }
+}
+
+@media (max-width: 960px) {
+  .pact-shell .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pact-shell .side-column {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pact-shell .welcome-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .pact-shell .welcome-row > div {
+    grid-column: 1 / -1;
+  }
+  .pact-shell .welcome-row > button {
+    justify-self: start;
+  }
+  .pact-shell .welcome-row > button:last-child {
+    justify-self: end;
+  }
+}
+
+@media (max-width: 640px) {
+  .pact-shell .topbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 16px 0;
+  }
+  .pact-shell .brand-logo {
+    width: 100px;
+  }
+  .pact-shell .topbar-right {
+    gap: 10px;
+    margin-left: auto;
+  }
+  .pact-shell .identity-option {
+    min-height: 36px;
+    padding: 4px;
+    gap: 0;
+    font-size: 0;
+  }
+  .pact-shell .identity-option .avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 10px;
+  }
+  .pact-shell .account-entry {
+    font-size: 12px;
+    min-height: 44px;
+  }
+  .pact-shell .main-nav {
+    flex-basis: 100%;
+    order: 3;
+    min-height: 44px;
+    justify-content: flex-start;
+    margin: 0;
+    gap: 28px;
+  }
+  .pact-shell .nav-link {
+    min-height: 44px;
+    font-size: 14px;
+  }
+  .pact-shell .workspace {
+    width: calc(100% - 32px);
+    padding-top: 32px;
+  }
+  .pact-shell .welcome-row {
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .pact-shell .welcome-row h1 {
+    font-size: clamp(30px, 8vw, 36px);
+    letter-spacing: -0.03em;
+  }
+  .pact-shell .welcome-copy {
+    max-width: none;
+    font-size: 16px;
+    line-height: 24px;
+  }
+  .pact-shell .welcome-row > .reset-button {
+    min-height: 44px;
+    font-size: 13px;
+    padding: 10px 16px;
+  }
+  .pact-shell .eyebrow {
+    font-size: 11px;
+  }
+  .pact-shell .demo-notice {
+    padding: 16px;
+    gap: 12px;
+  }
+  .pact-shell .demo-notice-tag {
+    display: none;
+  }
+  .pact-shell .agreement-card-top {
+    flex-wrap: wrap;
+    padding: 16px;
+  }
+  .pact-shell .agreement-kind {
+    font-size: 10px;
+  }
+  .pact-shell .status-pill {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  .pact-shell .agreement-heading-row {
+    padding: 20px 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pact-shell .agreement-heading-row h2 {
+    font-size: 24px;
+    line-height: 30px;
+  }
+  .pact-shell .terms-readonly {
+    font-size: 10px;
+    max-width: none;
+  }
+  .pact-shell .amount-block {
+    margin: 0 16px;
+    padding: 20px;
+  }
+  .pact-shell .amount-value {
+    font-size: 40px;
+  }
+  .pact-shell .parties-row {
+    margin: 20px 16px 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .pact-shell .party-card {
+    min-height: 88px;
+    padding: 16px;
+  }
+  .pact-shell .party-connector {
+    display: none;
+  }
+  .pact-shell .party-label {
+    font-size: 11px;
+  }
+  .pact-shell .party-info strong {
+    font-size: 16px;
+  }
+  .pact-shell .party-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 12px;
+  }
+  .pact-shell .acceptance {
+    font-size: 12px;
+  }
+  .pact-shell .terms-row {
+    margin: 20px 16px 0;
+  }
+  .pact-shell .progress-section {
+    margin: 24px 16px 0;
+  }
+  .pact-shell .action-area {
+    margin: 20px 16px 16px;
+    padding: 16px;
+  }
+  .pact-shell .primary-action {
+    width: 100%;
+    min-height: 48px;
+    padding: 12px 16px;
+    font-size: 16px;
+  }
+  .pact-shell .side-column {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pact-shell .activity-card {
+    padding: 20px 16px 0;
+  }
+  .pact-shell .activity-item {
+    grid-template-columns: 23px minmax(0, 1fr);
+  }
+  .pact-shell .activity-item time {
+    grid-column: 2;
+    margin-top: -8px;
+  }
+  .pact-shell .activity-footer {
+    margin-right: -16px;
+    margin-left: -16px;
+    padding: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .pact-shell .ledger-card {
+    padding: 20px 16px;
+  }
+  .pact-shell .ledger-entry {
+    flex-wrap: wrap;
+  }
+  .pact-shell .ledger-header {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .pact-shell .page-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pact-shell #condition-records h2 {
+    font-size: 24px;
+    line-height: 30px;
+  }
+}
+
+@media (max-width: 380px) {
+  .pact-shell .welcome-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pact-shell .welcome-row > .reset-button,
+  .pact-shell .welcome-row > .reset-button:last-child {
+    width: 100%;
+    justify-self: stretch;
+  }
+}
