@@ -23,9 +23,10 @@ for (const width of [1280, 390]) {
     await expect(
       page.getByRole("button", { name: /^LM\s*Tenant$/ }),
     ).toBeDisabled();
-    await expect(
-      page.getByRole("link", { name: /Open contract PDF/ }),
-    ).toHaveAttribute("href", "/demo-contracts/demo-apartment-contract.pdf");
+    await expect(page.getByRole("link", { name: /View PDF/ })).toHaveAttribute(
+      "href",
+      "/demo-contracts/demo-apartment-contract.pdf",
+    );
     await expect(
       page.getByLabel("Agreement name", { exact: true }),
     ).toHaveValue("Apartment security deposit");
@@ -82,9 +83,10 @@ for (const width of [1280, 390]) {
           ),
         ),
       );
-    await expect(
-      page.getByRole("link", { name: /Open contract PDF/ }),
-    ).toHaveAttribute("href", /^blob:/);
+    await expect(page.getByRole("link", { name: /View PDF/ })).toHaveAttribute(
+      "href",
+      /^blob:/,
+    );
     await create.click();
 
     await expect(
@@ -113,9 +115,10 @@ for (const width of [1280, 390]) {
     );
     expect(contract.source).toBe("browser-demo");
     await page.reload();
-    await expect(
-      page.getByRole("link", { name: /Open contract PDF/ }),
-    ).toHaveAttribute("href", /^blob:/);
+    await expect(page.getByRole("link", { name: /View PDF/ })).toHaveAttribute(
+      "href",
+      /^blob:/,
+    );
     expect(
       await page.evaluate(
         () =>

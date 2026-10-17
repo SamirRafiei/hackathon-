@@ -229,7 +229,7 @@ describe("required contract PDF", () => {
       contract,
     });
     expect(
-      screen.getByRole("link", { name: /Open contract PDF: lease.pdf/ }),
+      screen.getByRole("link", { name: /View PDF: lease.pdf/ }),
     ).toHaveAttribute("href", "blob:contract");
   });
 

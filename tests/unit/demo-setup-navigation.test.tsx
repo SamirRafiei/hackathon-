@@ -21,9 +21,10 @@ describe("local setup entry", () => {
     expect(
       screen.queryByRole("button", { name: "Accept version 1.0" }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: /Open contract PDF/ }),
-    ).toHaveAttribute("href", "/demo-contracts/demo-apartment-contract.pdf");
+    expect(screen.getByRole("link", { name: /View PDF/ })).toHaveAttribute(
+      "href",
+      "/demo-contracts/demo-apartment-contract.pdf",
+    );
     expect(
       screen.queryByRole("link", { name: "Account setup preview" }),
     ).not.toBeInTheDocument();
@@ -65,9 +66,10 @@ describe("local setup entry", () => {
     expect(
       screen.queryByRole("heading", { name: "Set the terms together" }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: /Open contract PDF/ }),
-    ).toHaveAttribute("href", "/demo-contracts/demo-apartment-contract.pdf");
+    expect(screen.getByRole("link", { name: /View PDF/ })).toHaveAttribute(
+      "href",
+      "/demo-contracts/demo-apartment-contract.pdf",
+    );
     fireEvent.click(screen.getByRole("button", { name: "Reset demo" }));
     await screen.findByRole("heading", { name: "Set the terms together" });
     expect(screen.getByLabelText("Agreement name")).toHaveValue(
