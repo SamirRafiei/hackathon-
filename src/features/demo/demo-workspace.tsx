@@ -554,7 +554,7 @@ export default function DemoWorkspace() {
                   title={
                     agreement.status === "ACTIVE"
                       ? "Rental active"
-                      : "Funded � awaiting condition baseline"
+                      : "Funded — awaiting condition baseline"
                   }
                   text={
                     agreement.status === "ACTIVE"
