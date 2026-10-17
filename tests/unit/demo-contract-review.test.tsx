@@ -47,7 +47,9 @@ describe("tenant contract review", () => {
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry contract" }));
     expect(
-      await screen.findByRole("link", { name: "Open contract PDF: lease.pdf" }),
+      await screen.findByRole("link", {
+        name: "View PDF: lease.pdf (opens in a new tab)",
+      }),
     ).toHaveAttribute("href", "blob:verified-contract");
     await waitFor(() => expect(accept).toBeEnabled());
     expect(getUrl).toHaveBeenCalledTimes(2);
