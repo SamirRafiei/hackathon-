@@ -240,4 +240,116 @@ describe("Pact demo agreement lifecycle", () => {
     ).toEqual([-DEMO_AMOUNT_MINOR, DEMO_AMOUNT_MINOR]);
     expectBalancedLedger(settled);
   });
+
+  it("clears a rejected split when the owner instead refunds the full deposit", () => {
+    const proposed = proposeSplit(
+      returnReviewSnapshot(),
+      demoActors.landlord,
+      2_500,
+      "Camera repair",
+    );
+    const declined = declineSplit(proposed, demoActors.tenant);
+    const settled = approveFullRefund(declined, demoActors.landlord);
+
+    expect(settled.agreement.status).toBe("COMPLETED");
+    expect(settled.agreement.proposal).toBeNull();
+    expect(settled.agreement.reservedMinor).toBe(0);
+    expect(
+      settled.agreement.ledger
+        .filter((entry) => entry.account === "renter_refund")
+        .reduce((total, entry) => total + entry.amountMinor, 0),
+    ).toBe(DEMO_AMOUNT_MINOR);
+    expect(
+      settled.agreement.ledger.some(
+        (entry) => entry.account === "landlord_allocation",
+      ),
+    ).toBe(false);
+    expect(
+      settled.agreement.activity.map((event) => event.description),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("Asked the landlord to revise"),
+        expect.stringContaining("Approved the full renter refund"),
+      ]),
+    );
+    expectBalancedLedger(settled);
+    expect(() => approveFullRefund(settled, demoActors.landlord)).toThrow();
+    expect(() => approveSplit(settled, demoActors.tenant)).toThrow();
+  });
+
+  it("settles the camera example only after approval, including odd cents and boundaries", () => {
+    const camera = createDemoAgreement(demoActors.landlord, {
+      assetType: "EQUIPMENT",
+      title: "Camera deposit",
+      address: "Budapest pickup point",
+      startDate: "2026-11-01",
+      endDate: "2026-11-08",
+      amountMinor: 30_000,
+      terms:
+        "Return the camera and listed accessories in the recorded condition.",
+    });
+    const review = returnReviewDemoSnapshot(camera);
+    expect(review.agreement.reservedMinor).toBe(30_000);
+    const odd = proposeSplit(
+      review,
+      demoActors.landlord,
+      1,
+      "One-cent example",
+    );
+    expect(odd.agreement.proposal).toMatchObject({
+      ownerAllocationMinor: 1,
+      renterRefundMinor: 29_999,
+    });
+    for (const allocation of [0, 30_000]) {
+      const proposed = proposeSplit(
+        review,
+        demoActors.landlord,
+        allocation,
+        "Boundary example",
+      );
+      expect(proposed.agreement.proposal?.ownerAllocationMinor).toBe(
+        allocation,
+      );
+      expect(proposed.agreement.proposal?.renterRefundMinor).toBe(
+        30_000 - allocation,
+      );
+      const boundarySettlement = approveSplit(proposed, demoActors.tenant);
+      expect(boundarySettlement.agreement.reservedMinor).toBe(0);
+      expect(
+        boundarySettlement.agreement.ledger
+          .slice(-3)
+          .map((entry) => entry.amountMinor),
+      ).toEqual([-30_000, 30_000 - allocation, allocation]);
+      expectBalancedLedger(boundarySettlement);
+    }
+
+    const first = proposeSplit(
+      review,
+      demoActors.landlord,
+      2_500,
+      "Repair quote",
+    );
+    const declined = declineSplit(first, demoActors.tenant);
+    expect(declined.agreement.reservedMinor).toBe(30_000);
+    const revised = proposeSplit(
+      declined,
+      demoActors.landlord,
+      2_000,
+      "Revised quote",
+    );
+    expect(revised.agreement.proposal).toMatchObject({
+      version: 2,
+      ownerAllocationMinor: 2_000,
+      renterRefundMinor: 28_000,
+      tenantApproved: false,
+    });
+    const settled = approveSplit(revised, demoActors.tenant);
+    expect(settled.agreement.reservedMinor).toBe(0);
+    expect(settled.agreement.proposal?.tenantApproved).toBe(true);
+    expect(
+      settled.agreement.ledger.slice(-3).map((entry) => entry.amountMinor),
+    ).toEqual([-30_000, 28_000, 2_000]);
+    expectBalancedLedger(settled);
+    expect(() => approveSplit(settled, demoActors.tenant)).toThrow();
+  });
 });

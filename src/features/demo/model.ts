@@ -870,6 +870,7 @@ export function approveFullRefund(
     ...current,
     status: "COMPLETED",
     reservedMinor: 0,
+    proposal: null,
     ledger: [...current.ledger, ...entries],
   };
   agreement = recordActivity(
