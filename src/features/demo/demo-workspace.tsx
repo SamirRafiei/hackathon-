@@ -1,9 +1,6 @@
 "use client";
 
-import Image from "next/image";
-
 import {
-  ArrowDownLeft,
   ArrowUpRight,
   Check,
   ChevronRight,
@@ -50,18 +47,13 @@ import {
 import { LocalDemoRepository } from "@/features/demo/repository";
 import { HandoverWorkspace } from "@/features/handover/handover-workspace";
 import AgreementSetupForm from "@/features/agreements/components/agreement-setup-form";
+import { DemoActivity } from "./demo-activity";
+import { DemoHeader } from "./demo-header";
 
 const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
   month: "short",
   year: "numeric",
-});
-
-const dateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
 });
 
 function formatDate(value: string) {
@@ -100,7 +92,11 @@ function getProgress(status: DemoSnapshot["agreement"]["status"]) {
   return 4;
 }
 
-export default function DemoWorkspace() {
+export default function DemoWorkspace({
+  view = "agreements",
+}: {
+  view?: "agreements" | "activity";
+}) {
   const repository = useMemo(() => new LocalDemoRepository(), []);
   const [snapshot, setSnapshot] = useState(createInitialDemoSnapshot);
   const [hydrated, setHydrated] = useState(false);
@@ -255,65 +251,39 @@ export default function DemoWorkspace() {
   const landlordAcceptance = agreement.acceptedBy.landlord;
   const tenantAcceptance = agreement.acceptedBy.tenant;
 
+  if (view === "activity") {
+    return (
+      <main className="pact-shell">
+        <DemoHeader
+          view="activity"
+          isLandlord={isLandlord}
+          onSwitchIdentity={(role) => void switchIdentity(role)}
+        />
+        <div className="workspace" id="top">
+          {hydrated ? (
+            <DemoActivity agreement={agreement} />
+          ) : (
+            <p aria-live="polite">Loading saved demo…</p>
+          )}
+          <footer className="page-footer">
+            <span>PACT · RENTAL DEPOSIT DEMO</span>
+            <span>
+              <LockKeyhole size={12} /> Simulated flow · No bank connection
+            </span>
+            <span>Terms version {agreement.termsVersion}.0</span>
+          </footer>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="pact-shell">
-      <header className="topbar">
-        <a aria-label="Pact home" className="brand" href="#top">
-          <Image
-            src="/brand/pact.svg"
-            alt="Pact"
-            width={165}
-            height={68}
-            className="brand-logo"
-            preload
-          />
-        </a>
-        <nav aria-label="Main navigation" className="main-nav">
-          <a className="nav-link nav-link-active" href="#agreement">
-            Agreements
-          </a>
-          <a className="nav-link" href="#activity">
-            Activity
-          </a>
-        </nav>
-        <div className="topbar-right">
-          <span className="topbar-demo">
-            <span /> DEMO MODE
-          </span>
-          <fieldset className="identity-switch">
-            <legend className="sr-only">Choose a demo identity</legend>
-            <button
-              aria-pressed={isLandlord}
-              className={
-                isLandlord
-                  ? "identity-option identity-selected"
-                  : "identity-option"
-              }
-              onClick={() => void switchIdentity("landlord")}
-              type="button"
-            >
-              <span className="avatar avatar-landlord">MP</span>
-              <span>Landlord</span>
-            </button>
-            <button
-              aria-pressed={!isLandlord}
-              className={
-                !isLandlord
-                  ? "identity-option identity-selected"
-                  : "identity-option"
-              }
-              onClick={() => void switchIdentity("tenant")}
-              type="button"
-            >
-              <span className="avatar avatar-tenant">LM</span>
-              <span>Tenant</span>
-            </button>
-          </fieldset>
-          <a className="account-entry" href="/agreements/new">
-            Use account
-          </a>
-        </div>
-      </header>
+      <DemoHeader
+        view="agreements"
+        isLandlord={isLandlord}
+        onSwitchIdentity={(role) => void switchIdentity(role)}
+      />
 
       <div className="workspace" id="top">
         <div className="welcome-row">
@@ -849,114 +819,6 @@ export default function DemoWorkspace() {
           }
         />
 
-        <section
-          aria-labelledby="activity-heading"
-          className="activity-card"
-          id="activity"
-        >
-          <div className="activity-header">
-            <div>
-              <p className="section-kicker">LOCAL DEMO RECORD</p>
-              <h2 id="activity-heading">Agreement activity</h2>
-            </div>
-            <span className="activity-count">
-              {agreement.activity.length} updates
-            </span>
-          </div>
-          <div className="activity-list">
-            {agreement.activity.map((item, index) => (
-              <div className="activity-item" key={item.id}>
-                <span
-                  className={`activity-marker ${index === 0 ? "activity-marker-current" : ""}`}
-                >
-                  {index === 0 ? <Check size={14} /> : <span />}
-                </span>
-                <div className="activity-body">
-                  <strong>{item.description}</strong>
-                  <span>{item.actorName}</span>
-                </div>
-                <time dateTime={item.createdAt}>
-                  {dateTimeFormatter.format(new Date(item.createdAt))}
-                </time>
-              </div>
-            ))}
-          </div>
-          <div className="activity-footer">
-            <span>
-              <LockKeyhole size={13} /> Visible to both demo identities in this
-              browser
-            </span>
-            <button
-              onClick={() =>
-                document
-                  .getElementById("ledger")
-                  ?.scrollIntoView({ behavior: "smooth" })
-              }
-              type="button"
-            >
-              View ledger <ChevronRight size={14} />
-            </button>
-          </div>
-        </section>
-
-        <section
-          aria-labelledby="ledger-heading"
-          className="ledger-card"
-          id="ledger"
-        >
-          <div className="ledger-header">
-            <div>
-              <p className="section-kicker">SIMULATED TRANSACTIONS</p>
-              <h2 id="ledger-heading">Demo ledger</h2>
-            </div>
-            <span className="ledger-badge">NO REAL FUNDS</span>
-          </div>
-          {agreement.ledger.length === 0 ? (
-            <div className="ledger-empty">
-              <span>
-                <CircleDollarSign size={19} />
-              </span>
-              <p>
-                <strong>No ledger entries yet</strong>
-                <small>
-                  After both accept, simulated funding and settlement steps
-                  appear here.
-                </small>
-              </p>
-            </div>
-          ) : (
-            <div className="ledger-entries">
-              {agreement.ledger.map((entry) => (
-                <div className="ledger-entry" key={entry.id}>
-                  <span
-                    className={`ledger-entry-icon ${entry.amountMinor < 0 ? "ledger-out" : "ledger-in"}`}
-                  >
-                    {entry.amountMinor < 0 ? (
-                      <ArrowUpRight size={15} />
-                    ) : (
-                      <ArrowDownLeft size={15} />
-                    )}
-                  </span>
-                  <div>
-                    <strong>{ledgerAccountLabel(entry.account)}</strong>
-                    <small>Operation {entry.operationId.slice(0, 15)}</small>
-                  </div>
-                  <span
-                    className={
-                      entry.amountMinor < 0
-                        ? "ledger-amount ledger-negative"
-                        : "ledger-amount"
-                    }
-                  >
-                    {entry.amountMinor > 0 ? "+" : ""}
-                    {formatMoney(entry.amountMinor)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
         <footer className="page-footer">
           <span>PACT · RENTAL DEPOSIT DEMO</span>
           <span>
@@ -1125,19 +987,4 @@ function nextActorText(
   if (status === "RETURN_REVIEW") return "Maya Petrova · Landlord";
   if (status === "PROPOSAL_PENDING") return "Luca Martin · Tenant";
   return "Agreement complete";
-}
-
-function ledgerAccountLabel(
-  account: DemoSnapshot["agreement"]["ledger"][number]["account"],
-) {
-  switch (account) {
-    case "renter_available":
-      return "Tenant demo balance";
-    case "agreement_reserved":
-      return "Agreement reserved";
-    case "renter_refund":
-      return "Tenant refund";
-    case "landlord_allocation":
-      return "Landlord allocation";
-  }
 }
