@@ -2,7 +2,7 @@
 
 Make a pact. Keep it fair.
 
-Pact is a prototype for making rental deposits easier to understand and settle fairly. The current demo follows one apartment deposit from shared terms through simulated funding, return review, and an agreed split. The broader product plan is in [plan.md](./plan.md).
+Pact is a prototype for making rental deposits easier to understand and settle fairly. The demo starts with an apartment deposit and lets the landlord create an apartment or equipment security-deposit agreement. The tenant reviews and accepts the exact version before simulated funding, return review, and an agreed split. The broader product plan is in [plan.md](./plan.md).
 
 The idea can fit inside a banking app or another trusted host experience. This standalone prototype has no banking-provider integration and does not hold, move, or protect real money.
 
@@ -20,9 +20,9 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. The demo works without Docker, Supabase credentials, or an account. Use the landlord/tenant switcher to walk through the same seeded agreement. Demo choices and activity are saved in that browser's local storage, so two different browsers do not share data.
+Open http://localhost:3000. The demo works without Docker, Supabase credentials, or an account. Use the landlord/tenant switcher to walk through the seeded agreement or create a local apartment/equipment agreement. Demo choices and activity are saved in that browser's local storage, so two different browsers do not share data.
 
-This identity switch is a demo control, not sign-in or proof of identity. Anyone can switch between the fake parties. Do not use real personal information or money. Future host-app integration must verify a signed identity assertion on the server; a browser-provided name, role, or biometric claim is not sufficient. The Supabase factories and database operations remain unused by this demo. Migrations are not applied to a local or hosted database, and server authorization/route wiring remains future work.
+This identity switch is a demo control, not sign-in or proof of identity. Anyone can switch between the fake parties. Agreement setup, version acceptance, and activity are saved only in browser local storage and can be changed by the browser user; they are not authoritative records. Do not use real personal information or money. Future host-app integration must verify a signed identity assertion on the server; a browser-provided name, role, or biometric claim is not sufficient. The Supabase factories and database operations remain unused by this demo. Migrations are not applied to a local or hosted database, and server authorization/route wiring remains future work.
 
 ## Project structure
 
@@ -32,7 +32,7 @@ src/
   components/ui/       Shared accessible UI components
   features/
     demo/               Seeded agreement, local demo repository, interactive workflow
-    agreements/        Reserved for future creation, revisions, invitations, acceptance
+    agreements/        Local demo setup form; authenticated persistence is pending
     deposits/          Reserved for future provider, persistent funding, transaction history
     handover/          Condition evidence, QR/code, collection, return
     disputes/          Claims, negotiation, reviewer workspace
@@ -87,7 +87,7 @@ The interactive demo uses the Next.js App Router, React client state, Zod to val
 | `npm run db:types`                             | Generate types from running local Supabase            |
 | `npm run db:types -- --project-id PROJECT_REF` | Generate types from an authorized hosted project      |
 
-Vitest covers the simulated agreement lifecycle, domain rules and local-storage repository. `npm run test:db` applies the migrations in embedded PGlite and checks database constraints/policies. PGlite is useful for SQL regression checks but does not establish hosted Supabase behavior, true concurrent transaction safety, server authorization, or real money movement. Playwright is configured, but there are no browser journeys yet. Before running the first browser test, install Chromium with `npx playwright install chromium` (on Linux CI use `--with-deps`). GitHub Actions currently runs `npm run check`, not browser tests.
+Vitest covers simulated agreement setup, acceptance/lifecycle, form validation, domain rules and local-storage persistence. `npm run test:db` applies the migrations in embedded PGlite and checks database constraints/policies. PGlite is useful for SQL regression checks but does not establish hosted Supabase behavior, true concurrent transaction safety, server authorization, or real money movement. Playwright is configured, but there are no browser journeys yet. Before running the first browser test, install Chromium with `npx playwright install chromium` (on Linux CI use `--with-deps`). GitHub Actions currently runs `npm run check`, not browser tests.
 
 ## Supabase workflow
 

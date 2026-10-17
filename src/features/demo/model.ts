@@ -43,8 +43,10 @@ export type SettlementProposal = {
 
 export type DemoAgreement = {
   id: string;
+  assetType: "APARTMENT" | "EQUIPMENT";
   title: string;
   address: string;
+  terms: string;
   startDate: string;
   endDate: string;
   termsVersion: number;
@@ -98,8 +100,15 @@ export const demoSnapshotSchema = z
     activeActorId: z.enum(["demo-landlord", "demo-tenant"]),
     agreement: z.object({
       id: z.string(),
-      title: z.string(),
-      address: z.string(),
+      assetType: z.enum(["APARTMENT", "EQUIPMENT"]).default("APARTMENT"),
+      title: z.string().max(120),
+      address: z.string().max(240),
+      terms: z
+        .string()
+        .max(20000)
+        .default(
+          "Both parties agree to the stated rental dates, condition checklist, and 48-hour return review. Any deduction requires mutual agreement.",
+        ),
       startDate: z.string(),
       endDate: z.string(),
       termsVersion: z.number().int().positive(),
@@ -277,8 +286,11 @@ export function createInitialDemoSnapshot(): DemoSnapshot {
     activeActorId: demoActors.tenant.id,
     agreement: {
       id: "demo-apartment-agreement",
+      assetType: "APARTMENT",
       title: "Apartment security deposit",
       address: "18 Kertész utca, Budapest",
+      terms:
+        "Both parties agree to the stated rental dates, condition checklist, and 48-hour return review. Any deduction requires mutual agreement.",
       startDate: "2026-09-01",
       endDate: "2027-08-31",
       termsVersion: 1,
@@ -311,6 +323,75 @@ export function actorForId(id: DemoSnapshot["activeActorId"]): PactActor {
   return id === demoActors.landlord.id
     ? demoActors.landlord
     : demoActors.tenant;
+}
+
+export type DemoAgreementInput = {
+  assetType: DemoAgreement["assetType"];
+  title: string;
+  address: string;
+  startDate: string;
+  endDate: string;
+  amountMinor: number;
+  terms: string;
+};
+
+const agreementInputSchema = z
+  .object({
+    assetType: z.enum(["APARTMENT", "EQUIPMENT"]),
+    title: z.string().trim().min(1, "Add a name for this agreement.").max(120),
+    address: z.string().trim().min(1, "Add the property's location.").max(240),
+    startDate: z.iso.date(),
+    endDate: z.iso.date(),
+    amountMinor: z.number().int().min(100).max(100_000_000),
+    terms: z.string().trim().min(10, "Add the agreement terms.").max(20000),
+  })
+  .refine((value) => value.endDate > value.startDate, {
+    path: ["endDate"],
+    message: "The end date must be after the start date.",
+  });
+
+export function createDemoAgreement(
+  actor: PactActor,
+  input: DemoAgreementInput,
+): DemoSnapshot {
+  requireRole(actor, "landlord");
+  const parsed = agreementInputSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new Error(
+      parsed.error.issues[0]?.message ?? "Check the agreement details.",
+    );
+  }
+
+  const values = parsed.data;
+  const now = new Date().toISOString();
+  return {
+    activeActorId: actor.id as DemoSnapshot["activeActorId"],
+    agreement: {
+      id: newId("demo-agreement"),
+      assetType: values.assetType,
+      title: values.title,
+      address: values.address,
+      terms: values.terms,
+      startDate: values.startDate,
+      endDate: values.endDate,
+      termsVersion: 1,
+      amountMinor: values.amountMinor,
+      currency: DEMO_CURRENCY,
+      status: "AWAITING_ACCEPTANCE",
+      acceptedBy: { landlord: true, tenant: false },
+      reservedMinor: 0,
+      proposal: null,
+      ledger: [],
+      activity: [
+        {
+          id: newId("event"),
+          actorName: actor.displayName,
+          description: "Created version 1 and accepted the proposed terms",
+          createdAt: now,
+        },
+      ],
+    },
+  };
 }
 
 function newId(prefix: string) {
@@ -349,12 +430,16 @@ export function acceptTerms(
   if (snapshot.agreement.status !== "AWAITING_ACCEPTANCE") {
     throw new Error("These terms are no longer awaiting acceptance.");
   }
+  requireRole(actor, "tenant");
+  if (snapshot.agreement.acceptedBy.tenant) {
+    throw new Error("You have already accepted this version.");
+  }
   const acceptedBy = { ...snapshot.agreement.acceptedBy, [actor.role]: true };
   let agreement: DemoAgreement = { ...snapshot.agreement, acceptedBy };
   agreement = recordActivity(
     agreement,
     actor,
-    "Accepted agreement version 1.0",
+    `Accepted agreement version ${agreement.termsVersion}.0`,
   );
   if (acceptedBy.landlord && acceptedBy.tenant) {
     agreement = { ...agreement, status: "AWAITING_FUNDING" };
@@ -421,7 +506,7 @@ export function submitReturn(
   agreement = recordActivity(
     agreement,
     actor,
-    "Recorded the apartment return and started the review",
+    "Recorded the rental return and started the review",
   );
   return { ...snapshot, agreement };
 }

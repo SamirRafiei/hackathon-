@@ -11,6 +11,7 @@ import {
   HandCoins,
   KeyRound,
   LockKeyhole,
+  Plus,
   RotateCcw,
   ShieldCheck,
   Sparkles,
@@ -33,6 +34,7 @@ import {
   approveFullRefund,
   approveSplit,
   createInitialDemoSnapshot,
+  createDemoAgreement,
   declineSplit,
   formatMoney,
   fundAgreement,
@@ -41,6 +43,7 @@ import {
   type DemoSnapshot,
 } from "@/features/demo/model";
 import { LocalDemoRepository } from "@/features/demo/repository";
+import AgreementSetupForm from "@/features/agreements/components/agreement-setup-form";
 
 const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
@@ -97,6 +100,8 @@ export default function DemoWorkspace() {
   const [reasonInput, setReasonInput] = useState(
     "Cleaning and key replacement costs",
   );
+  const [showSetup, setShowSetup] = useState(false);
+  const [tenantConfirmedTerms, setTenantConfirmedTerms] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -158,6 +163,7 @@ export default function DemoWorkspace() {
     };
     setSnapshot(next);
     setNotice("");
+    setTenantConfirmedTerms(false);
     void repository.save(next);
   }
 
@@ -178,7 +184,26 @@ export default function DemoWorkspace() {
     setSnapshot(initial);
     setAllocationInput("300");
     setReasonInput("Cleaning and key replacement costs");
+    setShowSetup(false);
+    setTenantConfirmedTerms(false);
     setNotice("Demo agreement reset to its starting point.");
+  }
+
+  function createAgreement(input: Parameters<typeof createDemoAgreement>[1]) {
+    try {
+      const next = createDemoAgreement(actor, input);
+      setSnapshot(next);
+      setShowSetup(false);
+      setTenantConfirmedTerms(false);
+      setNotice("Version 1 is ready for the tenant to review and accept.");
+      void repository.save(next);
+    } catch (error) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "The agreement could not be created.",
+      );
+    }
   }
 
   const landlordAcceptance = agreement.acceptedBy.landlord;
@@ -252,6 +277,13 @@ export default function DemoWorkspace() {
           </div>
           <button
             className="reset-button"
+            onClick={() => setShowSetup((visible) => !visible)}
+            type="button"
+          >
+            <Plus size={15} /> New agreement
+          </button>
+          <button
+            className="reset-button"
             onClick={() => void resetDemo()}
             type="button"
           >
@@ -279,6 +311,14 @@ export default function DemoWorkspace() {
           </div>
         )}
 
+        {showSetup && (
+          <AgreementSetupForm
+            isLandlord={isLandlord}
+            onCancel={() => setShowSetup(false)}
+            onCreate={createAgreement}
+          />
+        )}
+
         <div className="dashboard-grid">
           <section
             aria-labelledby="agreement-heading"
@@ -290,7 +330,9 @@ export default function DemoWorkspace() {
                 <span className="kind-icon">
                   <KeyRound size={16} />
                 </span>{" "}
-                SECURITY DEPOSIT
+                {agreement.assetType === "APARTMENT"
+                  ? "APARTMENT SECURITY DEPOSIT"
+                  : "EQUIPMENT SECURITY DEPOSIT"}
               </div>
               <span
                 className={`status-pill status-${agreement.status.toLowerCase().replaceAll("_", "-")}`}
@@ -305,14 +347,9 @@ export default function DemoWorkspace() {
                 <h2 id="agreement-heading">{agreement.title}</h2>
                 <p className="address-line">{agreement.address}</p>
               </div>
-              <button
-                aria-label="Agreement details"
-                className="icon-button"
-                type="button"
-                title="Agreement details"
-              >
-                <ChevronRight size={19} />
-              </button>
+              <span className="terms-readonly">
+                VERSION {agreement.termsVersion}.0
+              </span>
             </div>
 
             <div className="amount-block">
@@ -380,6 +417,7 @@ export default function DemoWorkspace() {
               </div>
               <span className="terms-readonly">FIXED AFTER FUNDING</span>
             </div>
+            <p className="terms-text">{agreement.terms}</p>
 
             <div className="progress-section">
               <div className="progress-heading">
@@ -412,16 +450,32 @@ export default function DemoWorkspace() {
                     text={`Waiting for ${actor.role === "landlord" ? "the tenant" : "the landlord"} to accept the same version.`}
                   />
                 ) : (
-                  <ActionPanel
-                    description="Review the amount, dates, and refund steps before accepting this version."
-                    onClick={() =>
-                      commit((current, currentActor) =>
-                        acceptTerms(current, currentActor),
-                      )
-                    }
-                    title="Accept the agreement"
-                    buttonLabel="Accept version 1.0"
-                  />
+                  <>
+                    <label className="acceptance-check">
+                      <input
+                        checked={tenantConfirmedTerms}
+                        onChange={(event) =>
+                          setTenantConfirmedTerms(event.target.checked)
+                        }
+                        type="checkbox"
+                      />
+                      <span>
+                        I reviewed and accept version {agreement.termsVersion}.0
+                        of these terms.
+                      </span>
+                    </label>
+                    <ActionPanel
+                      description="Your acceptance applies to this version only. Any later revision would need fresh approval."
+                      onClick={() =>
+                        commit((current, currentActor) =>
+                          acceptTerms(current, currentActor),
+                        )
+                      }
+                      title="Accept the agreement"
+                      buttonLabel={`Accept version ${agreement.termsVersion}.0`}
+                      disabled={!tenantConfirmedTerms}
+                    />
+                  </>
                 ))}
               {agreement.status === "AWAITING_FUNDING" &&
                 (actor.role === "tenant" ? (
@@ -453,7 +507,7 @@ export default function DemoWorkspace() {
                       )
                     }
                     title="Deposit reserved in the demo ledger"
-                    buttonLabel="Record apartment return"
+                    buttonLabel={`Record ${agreement.assetType === "APARTMENT" ? "apartment" : "equipment"} return`}
                     icon={<KeyRound size={17} />}
                   />
                 ) : (
@@ -635,7 +689,7 @@ export default function DemoWorkspace() {
                 <span className="side-card-icon">
                   <CircleDollarSign size={18} />
                 </span>
-                <span className="section-kicker">SHARED OVERVIEW</span>
+                <span className="section-kicker">DEMO OVERVIEW</span>
               </div>
               <h2 id="next-step-heading">
                 {agreement.status === "COMPLETED"
@@ -700,7 +754,14 @@ export default function DemoWorkspace() {
                   <FileText size={17} />
                 </span>
               </div>
-              <DetailLine label="Property" value="Apartment" />
+              <DetailLine
+                label="Asset type"
+                value={
+                  agreement.assetType === "APARTMENT"
+                    ? "Apartment"
+                    : "Equipment"
+                }
+              />
               <DetailLine
                 label="Deposit"
                 value={formatMoney(agreement.amountMinor)}
@@ -712,7 +773,7 @@ export default function DemoWorkspace() {
               />
               <div className="details-footer">
                 <span>DEMO AGREEMENT</span>
-                <span>ID · PACT-2048</span>
+                <span>ID · {agreement.id.slice(-8).toUpperCase()}</span>
               </div>
             </section>
           </aside>
@@ -725,7 +786,7 @@ export default function DemoWorkspace() {
         >
           <div className="activity-header">
             <div>
-              <p className="section-kicker">A SHARED RECORD</p>
+              <p className="section-kicker">LOCAL DEMO RECORD</p>
               <h2 id="activity-heading">Agreement activity</h2>
             </div>
             <span className="activity-count">
@@ -752,7 +813,8 @@ export default function DemoWorkspace() {
           </div>
           <div className="activity-footer">
             <span>
-              <LockKeyhole size={13} /> Visible to both demo participants
+              <LockKeyhole size={13} /> Visible to both demo identities in this
+              browser
             </span>
             <button
               onClick={() =>
@@ -893,12 +955,14 @@ function ActionPanel({
   buttonLabel,
   onClick,
   icon,
+  disabled = false,
 }: {
   title: string;
   description: string;
   buttonLabel: string;
   onClick: () => void;
   icon?: ReactNode;
+  disabled?: boolean;
 }) {
   return (
     <div className="action-panel">
@@ -909,7 +973,12 @@ function ActionPanel({
           <span>{description}</span>
         </div>
       </div>
-      <button className="primary-action" onClick={onClick} type="button">
+      <button
+        className="primary-action"
+        disabled={disabled}
+        onClick={onClick}
+        type="button"
+      >
         {buttonLabel} <ChevronRight size={16} />
       </button>
     </div>
